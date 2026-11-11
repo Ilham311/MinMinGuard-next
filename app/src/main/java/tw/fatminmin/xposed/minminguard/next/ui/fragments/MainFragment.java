@@ -15,7 +15,6 @@ import java.util.Map;
 
 import tw.fatminmin.xposed.minminguard.next.FrameworkInfo;
 import tw.fatminmin.xposed.minminguard.next.R;
-import tw.fatminmin.xposed.minminguard.next.blocker.Util;
 import tw.fatminmin.xposed.minminguard.next.ui.MainActivity;
 import tw.fatminmin.xposed.minminguard.next.ui.adapter.AppsAdapter;
 import tw.fatminmin.xposed.minminguard.next.ui.models.AppDetails;
@@ -40,6 +39,8 @@ public class MainFragment extends Fragment
     private TextView mTxtActiveCount;
     private TextView mTxtActiveLabel;
     private TextView mTxtListHeader;
+    private TextView mTxtRuntime;
+    private TextView mTxtXposedEnabled;
 
     public static MainFragment newInstance()
     {
@@ -53,20 +54,18 @@ public class MainFragment extends Fragment
 
         View view = inflater.inflate(R.layout.fragment_main, container, false);
 
-        TextView txtXposedEnabled = view.findViewById(R.id.txt_xposed_enable);
-        TextView txtRuntime = view.findViewById(R.id.txt_runtime);
+        mTxtRuntime = view.findViewById(R.id.txt_runtime);
+        mTxtXposedEnabled = view.findViewById(R.id.txt_xposed_enable);
         mTxtEmpty = view.findViewById(R.id.txt_empty);
         mTxtListHeader = view.findViewById(R.id.txt_list_header);
         mTxtTotalBlocked = view.findViewById(R.id.txt_total_blocked);
         mTxtActiveCount = view.findViewById(R.id.txt_active_count);
         mTxtActiveLabel = view.findViewById(R.id.txt_active_count_label);
 
-        if (!Util.xposedEnabled())
-        {
-            txtXposedEnabled.setVisibility(View.VISIBLE);
-        }
-
-        txtRuntime.setText(FrameworkInfo.describe(requireContext()));
+        // Baris runtime sengaja tidak diisi di sini: render() selalu berjalan
+        // di onViewCreated() dan mengisi nilai yang sudah memperhitungkan
+        // laporan aplikasi. Mengisinya lebih awal hanya membuat label sempat
+        // berkedip ke "tidak terdeteksi" lalu berubah.
 
         mRecyclerView = view.findViewById(R.id.recycler_view);
         mRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -84,6 +83,13 @@ public class MainFragment extends Fragment
         super.onViewCreated(view, savedInstanceState);
         if (mainActivity == null)
         {
+            // Tanpa activity tidak ada daftar untuk di-render, tetapi baris
+            // runtime tetap diisi supaya layar tidak menampilkan baris kosong.
+            android.content.Context context = getContext();
+            if (mTxtRuntime != null && context != null)
+            {
+                mTxtRuntime.setText(FrameworkInfo.describe(context, false));
+            }
             return;
         }
         render(visibleListOfActivity(), mainActivity.activeAppList.size(),
@@ -149,6 +155,22 @@ public class MainFragment extends Fragment
                 ? R.string.summary_active_app_singular
                 : R.string.summary_active_apps);
 
+        // Baris runtime disegarkan bersama ringkasan: begitu ada aplikasi yang
+        // melapor, modul terbukti berjalan walaupun proses UI ini sendiri tidak
+        // di-hook, sehingga labelnya tidak boleh tetap "tidak terdeteksi".
+        // getContext() dipakai, bukan requireContext(): ringkasan bisa tiba
+        // tepat saat fragmen sedang dilepas dan itu tidak boleh melempar.
+        android.content.Context context = getContext();
+        if (mTxtRuntime != null && context != null)
+        {
+            mTxtRuntime.setText(FrameworkInfo.describe(context, scopeSize > 0));
+        }
+        if (mTxtXposedEnabled != null)
+        {
+            boolean active = scopeSize > 0 || FrameworkInfo.isFrameworkActive();
+            mTxtXposedEnabled.setVisibility(active ? View.GONE : View.VISIBLE);
+        }
+
         // Header daftar hanya berguna bila memang ada aplikasi di scope;
         // menampilkannya di atas pesan kosong terlihat seperti bug.
         if (mTxtListHeader != null)
@@ -185,5 +207,7 @@ public class MainFragment extends Fragment
         mTxtTotalBlocked = null;
         mTxtActiveCount = null;
         mTxtActiveLabel = null;
+        mTxtRuntime = null;
+        mTxtXposedEnabled = null;
     }
 }

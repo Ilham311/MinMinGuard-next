@@ -133,6 +133,8 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
         {
             xposedVersionCode = XposedBridge.XPOSED_BRIDGE_VERSION;
         }
+        // Salinan di Util: proses UI membaca nilai ini tanpa memuat kelas Main.
+        Util.frameworkVersion = xposedVersionCode;
 
         MODULE_PATH = startupParam.modulePath;
 

@@ -26,7 +26,7 @@
 
     <string name="btn_ok">确认</string>
 
-    <string name="msg_xposed_not_enabled">模块尚未激活</string>
+    <string name="msg_xposed_not_enabled">模块未在此应用中运行。请在 LSPosed 作用域中启用后重启。</string>
     <string name="msg_enabled_crash_report">开启崩溃报告</string>
     <string name="msg_show_debug">Show debug info in Xposed log</string>
     <string name="msg_block_num">拦截 %d 个广告</string>

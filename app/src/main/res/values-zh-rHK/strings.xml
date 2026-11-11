@@ -26,7 +26,7 @@
 
     <string name="btn_ok">確認</string>
 
-    <string name="msg_xposed_not_enabled">Xposed 框架未啓動</string>
+    <string name="msg_xposed_not_enabled">模組未在此應用程式中執行。請在 LSPosed 範圍啟用後重新開機。</string>
     <string name="msg_enabled_crash_report">開啟崩潰回報</string>
     <string name="msg_show_debug">Show debug info in Xposed log</string>
     <string name="msg_block_num">攔截 %d 個廣告</string>

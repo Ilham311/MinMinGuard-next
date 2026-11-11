@@ -32,7 +32,7 @@ The project has been modernised (AGP 8.13 / Gradle 8.13, compileSdk 36, Java 17)
 
 Notes:
 
-- The module `applicationId` is `tw.fatminmin.xposed.minminguard.next` (version 3.1.1, versionCode 74). Xposed/LSPosed scope strings and the `assets/xposed_init` entry refer to this package.
+- The module `applicationId` is `tw.fatminmin.xposed.minminguard.next` (version 3.1.2, versionCode 75). Xposed/LSPosed scope strings and the `assets/xposed_init` entry refer to this package.
 - `de.robv.android.xposed:api:82` is resolved from `https://api.xposed.info/` (jcenter is gone).
 - If you point the build at a local SDK, put `sdk.dir=` in `local.properties` (git-ignored).
 
@@ -84,6 +84,32 @@ root, so the module reports itself instead: every process it hooks writes one
 row to `content://tw.fatminmin.xposed.minminguard.next/active`. An app therefore
 appears the first time it is opened after being added to scope. *Forget app
 list* clears those rows without deleting statistics.
+
+## What changed in 3.1.2
+
+A reporting fix found on a live device: the module was blocking ads while the
+runtime line on the main screen said `Framework: not active | Root: unknown`.
+
+- *Active* now means the module's own hook is live (`Util.xposedEnabled()`,
+  which the module replaces with `true` when the framework loads it), or that
+  another app has already reported blocking statistics — not just that
+  `XposedBridge.getXposedVersion()` succeeded. That native call can fail inside
+  the module's own process even while hooks are installed there, and the old
+  code reported the failure as "not active".
+- The API level falls back to the version captured at `initZygote`, copied into
+  `Util.frameworkVersion` so the UI process can read it without loading `Main`
+  (which implements framework interfaces that may not exist there).
+- The red "not running" banner and the runtime line now share one verdict, so
+  they can no longer contradict each other.
+- Root detection no longer relies only on manager package names, which are
+  hidden on many setups. `/proc/self/mountinfo` tokens (`magisk`, `ksu`,
+  `apatch`), module directories under `/data/adb` and the presence of `su` are
+  used as additional evidence, and an unreadable manager is reported as such
+  instead of as "unknown".
+- The list header no longer repeats the summary card's wording
+  ("Apps in LSPosed scope" beside "N apps in scope"); it now says "Per-app
+  details". The "not running" banner text explains what to do instead of just
+  stating that Xposed is off.
 
 ## What changed in 3.1.1
 

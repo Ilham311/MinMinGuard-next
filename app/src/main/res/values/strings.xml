@@ -22,8 +22,12 @@
 
     <string name="btn_ok">OK</string>
 
-    <string name="msg_xposed_not_enabled">Xposed is not enabled</string>
+    <string name="msg_xposed_not_enabled">The module is not running in this app. Enable it in LSPosed scope, then reboot.</string>
     <string name="msg_runtime">Framework: %1$s | Root: %2$s</string>
+    <string name="framework_not_detected">not detected</string>
+    <string name="framework_active">active</string>
+    <string name="root_manager_hidden">manager hidden (root present)</string>
+    <string name="root_not_detected">not detected</string>
     <string name="msg_enabled_crash_report">Enable crash report</string>
     <string name="msg_show_launcher_icon">Show launcher icon</string>
     <string name="msg_block_num">Blocked %d ads</string>
@@ -42,7 +46,7 @@
     <string name="summary_total_blocked">Total ads blocked</string>
     <string name="summary_active_apps">apps in scope</string>
     <string name="summary_active_app_singular">app in scope</string>
-    <string name="summary_header_active">Apps in LSPosed scope</string>
+    <string name="summary_header_active">Per-app details</string>
     <string name="msg_empty_scope">No app has reported in yet. Add apps to the module scope in LSPosed, reboot, then open each app once.</string>
     <string name="msg_no_match">No app matches your search.</string>
     <string name="forget_scope_confirm">Clear the list of apps that reported in? Apps will reappear the next time they are opened. Statistics are kept.</string>

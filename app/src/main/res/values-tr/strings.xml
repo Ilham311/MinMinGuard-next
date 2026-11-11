@@ -28,7 +28,7 @@
 
     <string name="btn_ok">TAMAM</string>
 
-    <string name="msg_xposed_not_enabled">Xposed etkin değil</string>
+    <string name="msg_xposed_not_enabled">Modül bu uygulamada çalışmıyor. LSPosed kapsamında etkinleştirip yeniden başlatın.</string>
     <string name="msg_enabled_crash_report">Hata raporlamayı etkinleştir</string>
     <string name="msg_show_debug">Xposed günlüğünde hata ayıklama bilgilerini göster</string>
     <string name="msg_show_launcher_icon">Başlatıcı simgesini göster</string>

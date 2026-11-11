@@ -26,7 +26,7 @@
     </string>
 
     <string name="btn_ok">OK</string>
-    <string name="msg_xposed_not_enabled">Xposed não está ativado</string>
+    <string name="msg_xposed_not_enabled">O módulo não está em execução neste app. Ative-o no escopo do LSPosed e reinicie.</string>
     <string name="msg_enabled_crash_report">Ativar crash report</string>
     <string name="msg_show_debug">Show debug info in Xposed log</string>
     <string name="msg_block_num">Bloqueado %d ads</string>

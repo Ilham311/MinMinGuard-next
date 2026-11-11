@@ -54,6 +54,16 @@ public final class Util
         return false;
     }
 
+    /**
+     * Versi framework Xposed yang dibaca saat {@code initZygote}.
+     * <p>
+     * Disimpan di sini, bukan di {@code Main}, supaya proses UI bisa
+     * membacanya tanpa memuat kelas {@code Main} — kelas itu mengimplementasikan
+     * antarmuka framework yang tidak tersedia bila proses tersebut tidak di-hook.
+     * Nilai {@code null} berarti belum diketahui di proses ini.
+     */
+    public static volatile Integer frameworkVersion;
+
     public static void log(String packageName, String msg)
     {
         if (DEBUG)

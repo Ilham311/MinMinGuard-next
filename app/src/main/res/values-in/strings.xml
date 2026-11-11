@@ -20,8 +20,12 @@
 
     <string name="btn_ok">OKE</string>
 
-    <string name="msg_xposed_not_enabled">Xposed tidak aktif</string>
+    <string name="msg_xposed_not_enabled">Modul tidak berjalan di aplikasi ini. Aktifkan di scope LSPosed, lalu reboot.</string>
     <string name="msg_runtime">Framework: %1$s | Root: %2$s</string>
+    <string name="framework_not_detected">tidak terdeteksi</string>
+    <string name="framework_active">aktif</string>
+    <string name="root_manager_hidden">manajer disembunyikan (root ada)</string>
+    <string name="root_not_detected">tidak terdeteksi</string>
     <string name="msg_enabled_crash_report">Aktifkan laporan crash</string>
     <string name="msg_show_launcher_icon">Tampilkan ikon peluncur</string>
     <string name="msg_block_num">%d iklan diblokir</string>
@@ -40,7 +44,7 @@
     <string name="summary_total_blocked">Total iklan diblokir</string>
     <string name="summary_active_apps">aplikasi di scope</string>
     <string name="summary_active_app_singular">aplikasi di scope</string>
-    <string name="summary_header_active">Aplikasi di scope LSPosed</string>
+    <string name="summary_header_active">Rincian per aplikasi</string>
     <string name="msg_empty_scope">Belum ada aplikasi yang melapor. Tambahkan aplikasi ke scope modul di LSPosed, reboot, lalu buka tiap aplikasi sekali.</string>
     <string name="msg_no_match">Tidak ada aplikasi yang cocok dengan pencarian.</string>
     <string name="forget_scope_confirm">Hapus daftar aplikasi yang sudah melapor? Aplikasi akan muncul lagi saat berikutnya dibuka. Statistik tetap disimpan.</string>
