@@ -30,7 +30,7 @@ public class mAdserve extends Blocker
             {
                 Util.log(packageName, "Detect mAdserve InAppWebView constructor in " + packageName);
                 Util.notifyRemoveAdView(null, packageName, 1);
-                Util.notifyAdNetwork(null, packageName, "mAdserve");
+                Util.countBlockedAd(null, packageName, "mAdserve");
                 if (param.thisObject instanceof android.view.View)
                 {
                     tw.fatminmin.xposed.minminguard.next.blocker.ViewBlocking

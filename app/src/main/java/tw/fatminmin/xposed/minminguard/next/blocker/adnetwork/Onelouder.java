@@ -65,7 +65,7 @@ public class Onelouder extends Blocker
                     Util.log(packageName, "Detect onelouder AdInterstitial displayInterstitial in " + packageName);
                     Util.setDefaultResult(param);
                     Util.notifyRemoveAdView(null, packageName, 1);
-                    Util.notifyAdNetwork(null, packageName, "Onelouder");
+                    Util.countBlockedAd(null, packageName, "Onelouder");
                 }
             });
         }
@@ -89,7 +89,7 @@ public class Onelouder extends Blocker
                 // ClassCastException pada tipe primitif.
                 Util.setDefaultResult(param);
                 Util.notifyRemoveAdView(null, packageName, 1);
-                Util.notifyAdNetwork(null, packageName, "Onelouder");
+                Util.countBlockedAd(null, packageName, "Onelouder");
             }
         });
     }

@@ -65,6 +65,8 @@ public class MainActivity extends AppCompatActivity
     private ArrayList<AppDetails> filteredAppList;
     /** Kueri pencarian aktif; string kosong berarti tanpa filter. */
     private String mQuery = "";
+    /** Statistik hasil pemuatan di thread latar; dipakai ulang saat filter berubah. */
+    private Map<String, AppStats> mStats;
     private SharedPreferences uiPref;
     public SharedPreferences modPref;
     private ViewPager mViewPager;
@@ -447,20 +449,29 @@ public class MainActivity extends AppCompatActivity
 
         mLoader.execute(() -> {
             final ArrayList<AppDetails> list;
+            final Map<String, AppStats> stats;
             try
             {
-                list = buildAppList(getPackageManager());
+                // Statistik dimuat di sini, sekali per pemuatan daftar, agar
+                // pencarian di kotak teks tidak menyentuh database setiap ketikan.
+                stats = StatsRepository.loadStats(this);
+                list = buildAppList(getPackageManager(), stats);
             }
             catch (Throwable t)
             {
                 runOnUiThread(() -> finishRefresh(null));
                 return;
             }
-            runOnUiThread(() -> finishRefresh(list));
+            runOnUiThread(() -> finishRefresh(list, stats));
         });
     }
 
     private void finishRefresh(ArrayList<AppDetails> list)
+    {
+        finishRefresh(list, null);
+    }
+
+    private void finishRefresh(ArrayList<AppDetails> list, Map<String, AppStats> stats)
     {
         mLoading.set(false);
 
@@ -482,11 +493,15 @@ public class MainActivity extends AppCompatActivity
         if (list != null)
         {
             masterAppList = list;
+            if (stats != null)
+            {
+                mStats = stats;
+            }
             applyFilter();
         }
     }
 
-    private ArrayList<AppDetails> buildAppList(final PackageManager pm)
+    private ArrayList<AppDetails> buildAppList(final PackageManager pm, final Map<String, AppStats> stats)
     {
         boolean showSystemApps = uiPref.getBoolean(Common.KEY_SHOW_SYSTEM_APPS, false);
         String sort = uiPref.getString(Common.KEY_SORT, Common.VALUE_SORT_NAME);
@@ -530,9 +545,12 @@ public class MainActivity extends AppCompatActivity
         else if (Common.VALUE_SORT_BLOCKED.equals(sort))
         {
             final Map<String, Integer> blockCounts = new HashMap<>();
-            for (AppStats stats : StatsRepository.loadStats(this).values())
+            if (stats != null)
             {
-                blockCounts.put(stats.getPackageName(), stats.getBlockNum());
+                for (AppStats appStats : stats.values())
+                {
+                    blockCounts.put(appStats.getPackageName(), appStats.getBlockNum());
+                }
             }
 
             Collections.sort(temp, (l, r) -> {
@@ -620,6 +638,7 @@ public class MainActivity extends AppCompatActivity
             MainFragment fragment = getFragmentAt(i);
             if (fragment != null && fragment.isAlive)
             {
+                fragment.setStats(mStats);
                 fragment.updateAndNotify(shown);
             }
         }

@@ -105,7 +105,7 @@ public final class HostBlock
 
         Util.log(packageName, "DNS diblokir: " + host);
         Util.notifyRemoveAdView(null, packageName, 1);
-        Util.notifyAdNetwork(null, packageName, "DNS");
+        Util.countBlockedAd(null, packageName, "DNS");
         return true;
     }
 }

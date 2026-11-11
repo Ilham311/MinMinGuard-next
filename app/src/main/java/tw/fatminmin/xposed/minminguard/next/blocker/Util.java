@@ -86,7 +86,21 @@ public final class Util
         }
     }
 
+    /**
+     * Mencatat bahwa sebuah jaringan iklan dipakai aplikasi ini.
+     * <p>
+     * Dipanggil saat hook dipasang, jadi ini <em>bukan</em> bukti ada iklan
+     * yang diblokir: kelas SDK hanya ditemukan. Karena itu hanya nama jaringan
+     * yang ditambahkan ke {@code AD_NETWORKS}, tanpa menambah {@code HIT_NUM}.
+     * Hitungan sesungguhnya datang dari jalur yang benar-benar memblokir.
+     */
     public static void notifyAdNetwork(Context context, String pkgName, String adNetwork)
+    {
+        StatsReporter.get().detectNetwork(pkgName, adNetwork);
+    }
+
+    /** Mencatat satu iklan yang benar-benar diblokir pada sebuah jaringan. */
+    public static void countBlockedAd(Context context, String pkgName, String adNetwork)
     {
         StatsReporter.get().recordNetwork(pkgName, adNetwork);
     }
@@ -279,6 +293,22 @@ public final class Util
         {
             setDefaultResult(param);
         }
+    }
+
+    /** Tipe balik method yang sedang di-hook, atau {@code null} bila tak diketahui. */
+    public static Class<?> returnTypeOfMethod(XC_MethodHook.MethodHookParam param)
+    {
+        return returnTypeOf(param);
+    }
+
+    /**
+     * Menandai sebuah pasangan kelas#method sudah dipasangi hook.
+     *
+     * @return {@code true} bila pemanggil pertama kali memasangnya
+     */
+    public static boolean markHookedOnce(String key)
+    {
+        return sHookedMethods.add(key);
     }
 
     private static Class<?> returnTypeOf(XC_MethodHook.MethodHookParam param)

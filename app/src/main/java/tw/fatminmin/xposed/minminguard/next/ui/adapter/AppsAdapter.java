@@ -154,10 +154,24 @@ public class AppsAdapter extends RecyclerView.Adapter<AppsAdapter.ViewHolder>
         notifyDataSetChanged();
     }
 
+    /**
+     * Mengganti daftar tampil tanpa menyentuh database.
+     * <p>
+     * Versi sebelumnya memanggil {@link StatsRepository#loadStats} di sini.
+     * Method ini dipanggil setiap kali kotak pencarian berubah, sehingga setiap
+     * ketikan menjalankan dua query ContentResolver di UI thread — dan kotak
+     * pencarian mengetik huruf demi huruf. Statistik dimuat terpisah lewat
+     * {@link #reloadStats()} setelah daftar selesai dimuat.
+     */
     public void setAppList(ArrayList<AppDetails> list)
     {
         appList = list;
-        mStats = StatsRepository.loadStats(mContext);
+    }
+
+    /** Mengisi statistik yang sudah dimuat di thread latar. */
+    public void setStats(Map<String, AppStats> stats)
+    {
+        mStats = stats == null ? Collections.<String, AppStats>emptyMap() : stats;
     }
 
     @Override

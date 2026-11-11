@@ -237,6 +237,21 @@ public class MinMinProvider extends ContentProvider
         }
         int hits = delta == null ? 0 : delta;
 
+        // Mode deteksi: SDK ditemukan saat hook dipasang. Nama jaringan tetap
+        // dicatat supaya aplikasi tampil punya jaringan itu, tetapi HIT_NUM
+        // tidak ditambah karena tidak ada iklan yang benar-benar diblokir.
+        try
+        {
+            if (Boolean.TRUE.equals(values.getAsBoolean(Common.KEY_NETWORK_DETECT)))
+            {
+                hits = 0;
+            }
+        }
+        catch (ClassCastException ignored)
+        {
+            // Nilai bukan boolean: perlakukan sebagai hit biasa.
+        }
+
         SQLiteDatabase db = mDatabase.getWritableDatabase();
         db.beginTransaction();
         try

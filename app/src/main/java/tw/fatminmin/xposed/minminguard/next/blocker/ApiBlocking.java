@@ -75,12 +75,12 @@ public final class ApiBlocking
                 if (param.thisObject instanceof View)
                 {
                     ViewBlocking.removeAdView(packageName, (View) param.thisObject);
-                    Util.notifyAdNetwork(null, packageName, blockerName);
+                    Util.countBlockedAd(null, packageName, blockerName);
                 }
                 else
                 {
                     Util.notifyRemoveAdView(null, packageName, 1);
-                    Util.notifyAdNetwork(null, packageName, blockerName);
+                    Util.countBlockedAd(null, packageName, blockerName);
                 }
             }
         });
@@ -135,7 +135,7 @@ public final class ApiBlocking
                 }
 
                 Util.notifyRemoveAdView(null, packageName, 1);
-                Util.notifyAdNetwork(null, packageName, blockerName);
+                Util.countBlockedAd(null, packageName, blockerName);
             }
         });
     }
@@ -195,7 +195,7 @@ public final class ApiBlocking
                 }
 
                 Util.notifyRemoveAdView(null, packageName, 1);
-                Util.notifyAdNetwork(null, packageName, blockerName);
+                Util.countBlockedAd(null, packageName, blockerName);
             }
         };
 

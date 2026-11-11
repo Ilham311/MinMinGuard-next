@@ -7,7 +7,9 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import java.io.ByteArrayInputStream;
+
 import de.robv.android.xposed.XC_MethodHook;
+import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 /**
@@ -82,7 +84,7 @@ public final class UrlFiltering
                         Util.notifyRemoveAdView(null, packageName, 1);
                     }
 
-                    Util.notifyAdNetwork(null, packageName, "WebView");
+                    Util.countBlockedAd(null, packageName, "WebView");
                     param.setResult(null);
                 }
             }
@@ -105,7 +107,7 @@ public final class UrlFiltering
                 {
                     Util.log(packageName, "blokir loadData");
                     Util.notifyRemoveAdView(null, packageName, 1);
-                    Util.notifyAdNetwork(null, packageName, "WebView");
+                    Util.countBlockedAd(null, packageName, "WebView");
                     param.setResult(null);
                 }
             }
@@ -126,7 +128,7 @@ public final class UrlFiltering
                 {
                     Util.log(packageName, "blokir loadDataWithBaseURL: " + url);
                     Util.notifyRemoveAdView(null, packageName, 1);
-                    Util.notifyAdNetwork(null, packageName, "WebView");
+                    Util.countBlockedAd(null, packageName, "WebView");
                     param.setResult(null);
                 }
             }
@@ -134,9 +136,16 @@ public final class UrlFiltering
     }
 
     /**
-     * Membungkus setiap WebViewClient yang dipasang aplikasi. WebViewClient
-     * adalah kelas biasa (bukan final), jadi menurunkan kelasnya di sini
-     * cukup, tanpa hook tambahan.
+     * Memasang hook pada method {@link WebViewClient} milik kelas client
+     * aplikasi, bukan mengganti objeknya.
+     * <p>
+     * Versi sebelumnya membungkus client dengan subclass yang hanya
+     * meng-override empat callback. Semua callback lain — {@code onPageStarted},
+     * {@code onPageFinished}, {@code onReceivedError}, {@code onLoadResource},
+     * {@code doUpdateVisitedHistory}, dan seterusnya — ikut hilang, sehingga
+     * progres halaman yang ditunggu aplikasi tidak pernah dilaporkan dan
+     * halaman bisa tampak menggantung. Dengan hook per method, perilaku asli
+     * tetap utuh; hanya URL iklan yang dipotong.
      */
     private static boolean hookSetWebViewClient(final String packageName, XC_LoadPackage.LoadPackageParam lpparam)
     {
@@ -149,89 +158,99 @@ public final class UrlFiltering
                     @Override
                     protected void beforeHookedMethod(MethodHookParam param)
                     {
-                        WebViewClient client = (WebViewClient) param.args[0];
-                        if (client == null || client instanceof BlockingWebViewClient)
+                        if (param.args.length == 0 || !(param.args[0] instanceof WebViewClient))
                         {
                             return;
                         }
-                        param.args[0] = new BlockingWebViewClient(client, packageName);
+                        hookClientClass(((WebViewClient) param.args[0]).getClass(), packageName);
                     }
                 }
         });
     }
 
-    /**
-     * Delegasi yang mengembalikan respons kosong untuk permintaan iklan dan
-     * meneruskan sisanya ke client asli.
-     */
-    private static final class BlockingWebViewClient extends WebViewClient
+    /** Memasang hook sekali per kelas client; aplikasi sering memasang yang sama berkali-kali. */
+    private static void hookClientClass(Class<?> clientClass, String packageName)
     {
-        private final WebViewClient mDelegate;
-        private final String mPackageName;
-
-        BlockingWebViewClient(WebViewClient delegate, String packageName)
+        if (clientClass == null || clientClass == WebViewClient.class)
         {
-            mDelegate = delegate;
-            mPackageName = packageName;
+            // Client bawaan: hook pada WebViewClient akan kena semua subclass,
+            // termasuk milik framework. Cukup kelas milik aplikasi.
+            return;
         }
 
-        @Override
-        public boolean shouldOverrideUrlLoading(WebView view, String url)
+        String key = "webviewclient:" + clientClass.getName();
+        if (!Util.markHookedOnce(key))
         {
-            if (Blocklist.get().isBlockedUrl(url))
+            return;
+        }
+
+        hookClientMethod(clientClass, "shouldOverrideUrlLoading", packageName);
+        hookClientMethod(clientClass, "shouldInterceptRequest", packageName);
+    }
+
+    private static void hookClientMethod(Class<?> clientClass, String methodName, final String packageName)
+    {
+        try
+        {
+            XposedBridge.hookAllMethods(clientClass, methodName, new XC_MethodHook()
             {
-                Util.log(mPackageName, "shouldOverrideUrlLoading diblokir: " + url);
-                Util.notifyRemoveAdView(null, mPackageName, 1);
-                Util.notifyAdNetwork(null, mPackageName, "WebView");
-                return true;
-            }
-            return mDelegate.shouldOverrideUrlLoading(view, url);
-        }
+                @Override
+                protected void afterHookedMethod(MethodHookParam param)
+                {
+                    // Signature yang di-hook:
+                    //   shouldOverrideUrlLoading(WebView, String)
+                    //   shouldOverrideUrlLoading(WebView, WebResourceRequest)
+                    //   shouldInterceptRequest(WebView, String)
+                    //   shouldInterceptRequest(WebView, WebResourceRequest)
+                    // URL selalu argumen kedua.
+                    String url = param.args.length > 1 ? urlOf(param.args[1]) : null;
+                    if (url == null || !Blocklist.get().isBlockedUrl(url))
+                    {
+                        return;
+                    }
 
-        @Override
-        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request)
-        {
-            if (request != null && Blocklist.get().isBlockedUrl(request.getUrl().toString()))
-            {
-                Util.log(mPackageName, "shouldOverrideUrlLoading diblokir");
-                Util.notifyRemoveAdView(null, mPackageName, 1);
-                Util.notifyAdNetwork(null, mPackageName, "WebView");
-                return true;
-            }
-            return mDelegate.shouldOverrideUrlLoading(view, request);
-        }
+                    Class<?> returnType = Util.returnTypeOfMethod(param);
+                    if (returnType == WebResourceResponse.class)
+                    {
+                        // Respons kosong: sumber daya iklan tidak pernah diunduh.
+                        param.setResult(new WebResourceResponse(MIME_PLAIN, ENCODING,
+                                new ByteArrayInputStream(new byte[0])));
+                    }
+                    else if (returnType == boolean.class || returnType == Boolean.class)
+                    {
+                        // Menahan navigasi ke domain iklan.
+                        param.setResult(Boolean.TRUE);
+                    }
+                    else
+                    {
+                        // Method lain: biarkan berjalan, jangan dicatat sebagai blokir.
+                        return;
+                    }
 
-        @Override
-        public WebResourceResponse shouldInterceptRequest(WebView view, String url)
-        {
-            if (Blocklist.get().isBlockedUrl(url))
-            {
-                return blockedResponse(url);
-            }
-            return mDelegate.shouldInterceptRequest(view, url);
+                    Util.log(packageName, "WebView diblokir: " + url);
+                    Util.notifyRemoveAdView(null, packageName, 1);
+                    Util.countBlockedAd(null, packageName, "WebView");
+                }
+            });
         }
-
-        @Override
-        public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request)
+        catch (Throwable t)
         {
-            if (request != null && Blocklist.get().isBlockedUrl(request.getUrl().toString()))
-            {
-                return blockedResponse(request.getUrl().toString());
-            }
-            return mDelegate.shouldInterceptRequest(view, request);
-        }
-
-        /**
-         * Respons kosong untuk sub-resource iklan; sekaligus dicatat supaya
-         * banner di dalam halaman ikut terhitung pada statistik.
-         */
-        private WebResourceResponse blockedResponse(String url)
-        {
-            Util.log(mPackageName, "sub-resource diblokir: " + url);
-            Util.notifyRemoveAdView(null, mPackageName, 1);
-            Util.notifyAdNetwork(null, mPackageName, "WebView");
-            return new WebResourceResponse(MIME_PLAIN, ENCODING, new ByteArrayInputStream(new byte[0]));
+            Util.log(packageName, "hook " + clientClass.getName() + "#" + methodName + " gagal: " + t);
         }
     }
 
+    /** Mengambil URL dari argumen {@code String} atau {@link WebResourceRequest}. */
+    private static String urlOf(Object arg)
+    {
+        if (arg instanceof String)
+        {
+            return (String) arg;
+        }
+        if (arg instanceof WebResourceRequest)
+        {
+            android.net.Uri uri = ((WebResourceRequest) arg).getUrl();
+            return uri == null ? null : uri.toString();
+        }
+        return null;
+    }
 }

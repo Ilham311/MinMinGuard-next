@@ -42,7 +42,7 @@ public final class _2chMate
                     Util.log(packageName, "Detect 2chmate MyAdView in " + packageName);
                     Util.setResultCompat(param, null);
                     Util.notifyRemoveAdView(null, packageName, 1);
-                    Util.notifyAdNetwork(null, packageName, "2chMate");
+                    Util.countBlockedAd(null, packageName, "2chMate");
                 }
             }
         });

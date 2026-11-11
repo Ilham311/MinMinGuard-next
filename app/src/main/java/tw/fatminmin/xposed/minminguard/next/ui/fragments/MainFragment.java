@@ -17,14 +17,17 @@ import com.google.android.material.snackbar.Snackbar;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import tw.fatminmin.xposed.minminguard.next.Common;
 import tw.fatminmin.xposed.minminguard.next.FrameworkInfo;
 import tw.fatminmin.xposed.minminguard.next.R;
 import tw.fatminmin.xposed.minminguard.next.blocker.Util;
+import tw.fatminmin.xposed.minminguard.next.data.StatsRepository;
 import tw.fatminmin.xposed.minminguard.next.ui.MainActivity;
 import tw.fatminmin.xposed.minminguard.next.ui.adapter.AppsAdapter;
 import tw.fatminmin.xposed.minminguard.next.ui.models.AppDetails;
+import tw.fatminmin.xposed.minminguard.next.ui.models.AppStats;
 
 public class MainFragment extends Fragment
 {
@@ -38,6 +41,8 @@ public class MainFragment extends Fragment
     private TextView mTxtBatchCount;
     private TextView mTxtEmpty;
     private AppsAdapter adapter;
+    /** Statistik yang sudah dimuat di thread latar; diisi MainActivity. */
+    private Map<String, AppStats> mStats;
     private SharedPreferences mModPref;
     private final View.OnClickListener btnModeClick = new View.OnClickListener()
     {
@@ -287,9 +292,11 @@ public class MainFragment extends Fragment
     /** Menyegarkan hitungan iklan tanpa memuat ulang daftar aplikasi. */
     public void updateStats()
     {
-        if (adapter != null)
+        if (adapter != null && getContext() != null)
         {
-            adapter.reloadStats();
+            mStats = StatsRepository.loadStats(getContext());
+            adapter.setStats(mStats);
+            adapter.notifyDataSetChanged();
         }
     }
 
@@ -298,9 +305,25 @@ public class MainFragment extends Fragment
         if (adapter != null)
         {
             adapter.setAppList(list);
+            adapter.setStats(mStats);
             adapter.notifyDataSetChanged();
         }
         updateEmptyState(list);
+    }
+
+    /**
+     * Menyimpan statistik yang sudah dimuat di thread latar lalu
+     * menampilkannya. Dipanggil sekali per pemuatan daftar, bukan per ketikan
+     * pencarian.
+     */
+    public void setStats(Map<String, AppStats> stats)
+    {
+        mStats = stats;
+        if (adapter != null)
+        {
+            adapter.setStats(stats);
+            adapter.notifyDataSetChanged();
+        }
     }
 
     private void updateEmptyState(List<AppDetails> list)

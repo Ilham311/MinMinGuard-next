@@ -39,7 +39,7 @@ public class Og extends Blocker
                     Util.log(packageName, "Detect og AdWebView loadUrl in " + packageName);
                     Util.setDefaultResult(param);
                     Util.notifyRemoveAdView(null, packageName, 1);
-                    Util.notifyAdNetwork(null, packageName, "Og");
+                    Util.countBlockedAd(null, packageName, "Og");
 
                     if (param.thisObject instanceof View)
                     {

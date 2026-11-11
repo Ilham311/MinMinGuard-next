@@ -147,7 +147,7 @@ public final class NameBlocking
             return false;
         }
 
-        Util.notifyAdNetwork(view.getContext(), pkgName, network);
+        Util.countBlockedAd(view.getContext(), pkgName, network);
         return true;
     }
 

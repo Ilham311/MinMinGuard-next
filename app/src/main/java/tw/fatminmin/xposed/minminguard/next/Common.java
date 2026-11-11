@@ -54,6 +54,12 @@ public class Common
     public final static String KEY_BLOCK_NUM = "BLOCK_NUM";
     /** Delta hitungan untuk satu jaringan pada satu pemanggilan update(). */
     public final static String KEY_NETWORK_COUNT = "NETWORK_COUNT";
+    /**
+     * Bila true, jaringan hanya dicatat sebagai "ada di aplikasi ini" tanpa
+     * menambah HIT_NUM. Dipakai saat hook dipasang, karena menemukan kelas SDK
+     * bukan berarti ada iklan yang benar-benar diblokir.
+     */
+    public final static String KEY_NETWORK_DETECT = "NETWORK_DETECT";
 
     // Nama kolom cursor yang dikembalikan URI_STATS / URI_NETWORKS
     public final static String COL_PKG_NAME = "PKG_NAME";

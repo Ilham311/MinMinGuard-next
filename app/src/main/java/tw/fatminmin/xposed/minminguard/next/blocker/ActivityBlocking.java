@@ -110,13 +110,18 @@ public final class ActivityBlocking
                         }
 
                         Util.log(packageName, "menutup aktivitas iklan: " + name);
-                        Util.notifyAdNetwork(activity, packageName, network);
+                        Util.countBlockedAd(activity, packageName, network);
                         Util.notifyRemoveAdView(activity, packageName, 1);
 
                         // finish() sebelum konten dimuat menghindari animasi
                         // transisi dan membebaskan memori lebih cepat.
+                        //
+                        // JANGAN memakai param.setResult(null) di sini: itu
+                        // melewati Activity.onCreate() sehingga mCalled tidak
+                        // pernah diset, dan ActivityThread melempar
+                        // SuperNotCalledException — crash di proses aplikasi
+                        // induk, bukan sekadar menutup aktivitas iklan.
                         activity.finish();
-                        param.setResult(null);
                     }
                 }
         });
