@@ -36,13 +36,17 @@ public class TencentGDT extends Blocker
 
         result |= ApiBlocking.removeBanner(packageName, BANNER, "loadAd", lpparam);
 
-        result |= ApiBlocking.blockAdFunction(packageName, NATIVE_AD_MANAGER, "loadData", lpparam);
-        result |= ApiBlocking.blockAdFunction(packageName, INTERSTITIAL_AD, "loadAd", lpparam);
+        // GDT memakai setter listener terpisah untuk interstitial/reward.
+        result |= ApiBlocking.captureAdListener(packageName, INTERSTITIAL_AD, lpparam);
+        result |= ApiBlocking.captureAdListener(packageName, REWARD_VIDEO_AD, lpparam);
+
+        result |= ApiBlocking.blockAdLoad(packageName, NATIVE_AD_MANAGER, "loadData", lpparam);
+        result |= ApiBlocking.blockAdLoad(packageName, INTERSTITIAL_AD, "loadAd", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTERSTITIAL_AD, "show", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTERSTITIAL_AD, "showFullScreenAD", lpparam);
-        result |= ApiBlocking.blockAdFunction(packageName, REWARD_VIDEO_AD, "loadAD", lpparam);
+        result |= ApiBlocking.blockAdLoad(packageName, REWARD_VIDEO_AD, "loadAD", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, REWARD_VIDEO_AD, "showAD", lpparam);
-        result |= ApiBlocking.blockAdFunction(packageName, SPLASH_AD, "fetchAdOnly", lpparam);
+        result |= ApiBlocking.blockAdLoad(packageName, SPLASH_AD, "fetchAdOnly", lpparam);
 
         return result;
     }

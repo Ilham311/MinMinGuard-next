@@ -21,6 +21,7 @@ import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_InitPackageResources;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import tw.fatminmin.xposed.minminguard.next.blocker.ActivityBlocking;
+import tw.fatminmin.xposed.minminguard.next.blocker.AdCallbacks;
 import tw.fatminmin.xposed.minminguard.next.blocker.ApiBlocking;
 import tw.fatminmin.xposed.minminguard.next.blocker.BlockPrefs;
 import tw.fatminmin.xposed.minminguard.next.blocker.Blocker;
@@ -61,6 +62,7 @@ import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.Inmobi;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.Intowow;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.Ironsource;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.KuAd;
+import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.LevelPlay;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.Madvertise;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.MasAd;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.MdotM;
@@ -83,6 +85,7 @@ import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.Tapfortap;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.Tapjoy;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.TencentGDT;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.TopOn;
+import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.TradPlus;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.UnityAds;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.Vpadn;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.Vpon;
@@ -119,6 +122,9 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
             new Startapp(), new Tapfortap(), new TWMads(), new UnityAds(), new Vpadn(), new Vpon(), new Vungle(), new Waystorm(), new Yandex(),
             /* Jaringan modern: API-based bila signature dikenali, selalu prefix-based */
             new Pangle(), new Mintegral(), new Tapjoy(), new TencentGDT(), new Smaato(), new TopOn(),
+            /* Mediator: memuat iklan banyak jaringan di belakang satu API, jadi
+               harus dikenal walau SDK jaringannya sudah diblokir masing-masing. */
+            new TradPlus(), new LevelPlay(),
     };
 
     @SuppressWarnings("deprecation")
@@ -331,6 +337,8 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
         // sebelumnya (aplikasi yang sama, proses baru). Bersihkan dulu agar
         // view baru tidak dianggap sudah pernah diblokir.
         ViewBlocking.reset();
+        NameBlocking.reset();
+        AdCallbacks.reset();
 
         try
         {

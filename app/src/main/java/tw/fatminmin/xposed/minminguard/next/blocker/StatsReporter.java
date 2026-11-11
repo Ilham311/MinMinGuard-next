@@ -244,27 +244,29 @@ public final class StatsReporter
         }
         try
         {
-            mExecutor.execute(() -> {
-                try
-                {
-                    TimeUnit.MILLISECONDS.sleep(REGISTER_RETRY_DELAY_MS);
-                }
-                catch (InterruptedException ignored)
-                {
-                    Thread.currentThread().interrupt();
-                }
-                // Dilepas sebelum flush: flush() sendiri yang menjadwalkan
-                // percobaan berikutnya bila masih ada yang gagal, sehingga
-                // tidak ada dua percobaan yang menumpuk.
+            // Jeda dipasang lewat ScheduledExecutorService, bukan sleep di
+            // dalam task: sebelumnya task ini menahan satu-satunya thread
+            // executor selama 1,5 detik, dan selama itu semua pengiriman
+            // statistik ikut tertunda. Aplikasi yang membuka banyak iklan awal
+            // (persis alur reward) jadi menumpuk ribuan delta di memori.
+            sRetryScheduler.schedule(() -> {
                 mRetryScheduled.set(false);
                 flush();
-            });
+            }, REGISTER_RETRY_DELAY_MS, TimeUnit.MILLISECONDS);
         }
         catch (Throwable t)
         {
             mRetryScheduled.set(false);
         }
     }
+
+    /** Penjadwal terpisah untuk percobaan ulang pendaftaran. */
+    private static final java.util.concurrent.ScheduledExecutorService sRetryScheduler =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "mmg-retry");
+                t.setDaemon(true);
+                return t;
+            });
 
     /**
      * Mencoba ulang pendaftaran yang tertunda.

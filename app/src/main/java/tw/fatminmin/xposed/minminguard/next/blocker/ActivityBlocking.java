@@ -25,14 +25,28 @@ public final class ActivityBlocking
             // Google AdMob / GMS
             "com.google.android.gms.ads.AdActivity",
 
-            // ByteDance / Pangle
+            // ByteDance / Pangle.
+            //
+            // SDK 5.x+ menaruh aktivitas iklan di "...activity.single.*", bukan
+            // "...activity.*". Prefix lama tidak pernah cocok, sehingga reward
+            // video Pangle tetap tampil walau semua kelas iklan lain sudah
+            // diblokir. Kedua bentuk dicantumkan agar versi lama pun tertangani.
+            "com.bytedance.sdk.openadsdk.activity.single.TTInterstitialActivity",
+            "com.bytedance.sdk.openadsdk.activity.single.TTFullScreenVideoActivity",
+            "com.bytedance.sdk.openadsdk.activity.single.TTRewardVideoActivity",
+            "com.bytedance.sdk.openadsdk.activity.single.TTAppOpenAdActivity",
+            "com.bytedance.sdk.openadsdk.activity.single.TTRewardExpressVideoActivity",
+            "com.bytedance.sdk.openadsdk.activity.single.TTFullScreenExpressVideoActivity",
             "com.bytedance.sdk.openadsdk.activity.TTInterstitialActivity",
             "com.bytedance.sdk.openadsdk.activity.TTFullScreenVideoActivity",
             "com.bytedance.sdk.openadsdk.activity.TTRewardVideoActivity",
             "com.bytedance.sdk.openadsdk.activity.TTAppOpenAdActivity",
             "com.bytedance.sdk.openadsdk.activity.TTRewardExpressVideoActivity",
 
-            // Mintegral / Mobvista
+            // Mintegral / Mobvista (nama kelas nyata pada SDK modern).
+            "com.mbridge.msdk.interstitial.view.MBInterstitialActivity",
+            "com.mbridge.msdk.reward.player.MBRewardVideoActivity",
+            "com.mbridge.msdk.config.activity.MBRewardVideoActivity",
             "com.mintegral.msdk.activity.MTGInterstitialActivity",
             "com.mintegral.msdk.activity.MTGRewardActivity",
             "com.mintegral.msdk.activity.MTGAppOpenAdActivity",
@@ -79,7 +93,20 @@ public final class ActivityBlocking
             // TopOn
             "com.anythink.interstitial.activity.ATInterstitialActivity",
             "com.anythink.rewardvideo.activity.ATRewardVideoActivity",
-            "com.anythink.splashad.activity.ATSplashActivity"
+            "com.anythink.splashad.activity.ATSplashActivity",
+
+            // TradPlus (mediator)
+            "com.tradplus.ads.mgr.interstitial.views.InterNativeActivity",
+            "com.tradplus.ads.mgr.interstitial.views.InterNativeAPI26Activity",
+
+            // Facebook Audience Network
+            "com.facebook.ads.AudienceNetworkActivity",
+
+            // InMobi
+            "com.inmobi.ads.rendering.InMobiAdActivity",
+
+            // AppLovin fullscreen
+            "com.applovin.adview.AppLovinFullscreenImmersiveActivity"
     ));
 
     private ActivityBlocking() throws InstantiationException
@@ -167,7 +194,7 @@ public final class ActivityBlocking
         {
             return "Pangle";
         }
-        if (prefix.startsWith("com.mintegral"))
+        if (prefix.startsWith("com.mintegral") || prefix.startsWith("com.mbridge"))
         {
             return "Mintegral";
         }
@@ -222,6 +249,18 @@ public final class ActivityBlocking
         if (prefix.startsWith("com.anythink"))
         {
             return "TopOn";
+        }
+        if (prefix.startsWith("com.tradplus"))
+        {
+            return "TradPlus";
+        }
+        if (prefix.startsWith("com.facebook"))
+        {
+            return "Facebook";
+        }
+        if (prefix.startsWith("com.inmobi"))
+        {
+            return "Inmobi";
         }
         return "Interstitial";
     }

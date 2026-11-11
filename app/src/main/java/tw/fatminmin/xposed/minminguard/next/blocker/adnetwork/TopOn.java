@@ -36,11 +36,16 @@ public class TopOn extends Blocker
 
         result |= ApiBlocking.removeBanner(packageName, BANNER_VIEW, "loadAd", lpparam);
 
-        result |= ApiBlocking.blockAdFunction(packageName, INTERSTITIAL, "load", lpparam);
+        // Listener dipasang lewat setAdListener() sebelum load(), jadi harus
+        // ditangkap lebih dulu agar aplikasi menerima kabar gagal.
+        result |= ApiBlocking.captureAdListener(packageName, INTERSTITIAL, lpparam);
+        result |= ApiBlocking.captureAdListener(packageName, REWARDED, lpparam);
+
+        result |= ApiBlocking.blockAdLoad(packageName, INTERSTITIAL, "load", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTERSTITIAL, "show", lpparam);
-        result |= ApiBlocking.blockAdFunction(packageName, REWARDED, "load", lpparam);
+        result |= ApiBlocking.blockAdLoad(packageName, REWARDED, "load", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, REWARDED, "show", lpparam);
-        result |= ApiBlocking.blockAdFunction(packageName, SPLASH, "loadAd", lpparam);
+        result |= ApiBlocking.blockAdLoad(packageName, SPLASH, "loadAd", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, NATIVE, "renderAdContainer", lpparam);
 
         return result;

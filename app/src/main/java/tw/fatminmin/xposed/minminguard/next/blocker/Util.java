@@ -32,6 +32,22 @@ public final class Util
     private static final Set<String> sHookedMethods = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 
     /**
+     * Kunci method yang sudah dipasangi hook oleh jenis callback tertentu.
+     * <p>
+     * Penelusuran hierarki membuat satu method dasar bisa ditemukan dari
+     * beberapa jenis iklan sekaligus: {@code BaseAdView#loadAd} tercapai dari
+     * {@code AdView} maupun {@code AdManagerAdView}. Tanpa penjagaan ini
+     * callback terpasang dua kali pada method yang sama, sehingga satu iklan
+     * terhitung dua kali di statistik.
+     * <p>
+     * Kuncinya menyertakan kelas callback, bukan sekadar {@code Method}:
+     * pemanggil berbeda memang sengaja memasang aksi berbeda pada method yang
+     * sama (mis. {@code show()} diblokir sekaligus dilaporkan), dan memakai
+     * {@code Method} saja akan membuang salah satunya.
+     */
+    private static final Set<String> sHookedMembers = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
+
+    /**
      * Cache hasil pencarian kelas per ClassLoader.
      * <p>
      * Setiap aplikasi yang di-hook mencoba memasang belasan SDK iklan yang
@@ -208,8 +224,25 @@ public final class Util
                 sHookedMethods.remove(key);
                 return false;
             }
-            XposedBridge.hookAllMethods(clazz, method, callback);
-            return true;
+
+            // XposedBridge.hookAllMethods hanya melihat getDeclaredMethods()
+            // pada kelas yang diberikan. Method warisan karena itu tidak pernah
+            // ter-hook: setAdListener pada AdView dideklarasikan di BaseAdView,
+            // loadAd() pada NativeAd di NativeAdBase, dan load() pada
+            // MBRewardVideoHandler di NonBidAdHandler. Tanpa menelusuri
+            // hierarki ini, listener banner AdMob dan native Facebook tidak
+            // pernah tertangkap, sehingga pemuatan yang diblokir tidak memberi
+            // kabar apa pun dan UI berputar. Pemuatan Mintegral bahkan tidak
+            // pernah diblokir sama sekali.
+            //
+            // Kedua arah TIDAK dicakup: penelusuran hanya berjalan ke atas
+            // (kelas dasar). Method yang ditimpa di kelas turunan tidak ikut
+            // ter-hook karena deklarasi turunan tidak memanggil super. Kasus
+            // nyata dari APK: BaseFullscreenAd#load menimpa BaseAd#load,
+            // IronSourceAdapter menimpa 11 method AbstractAdapter, dan
+            // AdManagerInterstitialAd menimpa InterstitialAd#load. Kelas-kelas
+            // seperti itu didaftarkan eksplisit di blocker masing-masing.
+            return hookHierarchy(clazz, method, callback);
         }
         catch (Throwable t)
         {
@@ -217,6 +250,245 @@ public final class Util
             log("mmg", "hookAllMethods " + className + "#" + method + " gagal: " + t);
             return false;
         }
+    }
+
+    /**
+     * Memasang hook pada deklarasi method bernama ini di hierarki kelas.
+     * <p>
+     * Method abstrak dilewati satu per satu. {@code hookAllMethods} melempar
+     * {@code IllegalArgumentException} untuk method seperti itu dan
+     * menghentikan seluruh pemasangan — persis yang terjadi pada
+     * {@code RewardedAd.show()}/{@code InterstitialAd.show()}: tidak satu pun
+     * hook terpasang, tetapi kegagalannya tercatat seolah method tidak ada.
+     * <p>
+     * Overload dicocokkan per <em>signature</em>, bukan per nama. Untuk
+     * signature yang ditimpa di kelas turunan, hanya deklarasi paling turunan
+     * yang di-hook: aplikasi memanggil metode itu lewat objek kelas turunan,
+     * dan bila kelas turunan memanggil {@code super}, memasang hook di kedua
+     * level membuat satu iklan terhitung dua kali.
+     * <p>
+     * Hierarki juga dihentikan sebelum mencapai kelas framework/Android:
+     * {@code BaseAdView} turun dari {@code android.view.ViewGroup}, dan
+     * {@code getDeclaredMethods()} pada kelas framework adalah panggilan
+     * refleksi mahal sekaligus berisiko memasang hook di luar cakupan modul.
+     *
+     * @return {@code true} bila minimal satu overload terpasang
+     */
+    private static boolean hookHierarchy(Class<?> clazz, String methodName, XC_MethodHook callback)
+    {
+        boolean hooked = false;
+        // Signature yang sudah ditangani oleh kelas turunan, supaya deklarasi
+        // yang ditimpa di kelas dasar tidak di-hook dua kali.
+        Set<String> handled = new java.util.HashSet<>();
+        Class<?> current = clazz;
+
+        for (int depth = 0; current != null && depth < 8; depth++)
+        {
+            ClassLoader loader = current.getClassLoader();
+            if (loader == null)
+            {
+                // Kelas framework dimuat bootstrap; tidak relevan untuk SDK iklan.
+                break;
+            }
+
+            try
+            {
+                for (Method method : current.getDeclaredMethods())
+                {
+                    if (!method.getName().equals(methodName))
+                    {
+                        continue;
+                    }
+                    String signature = signatureOf(method);
+                    if (!handled.add(signature))
+                    {
+                        // Sudah ditangani deklarasi di kelas turunan.
+                        continue;
+                    }
+                    if (java.lang.reflect.Modifier.isAbstract(method.getModifiers()))
+                    {
+                        continue;
+                    }
+                    if (!sHookedMembers.add(current.getName() + "#" + signature
+                            + "@" + callback.getClass().getName()))
+                    {
+                        hooked = true;
+                        continue;
+                    }
+                    try
+                    {
+                        XposedBridge.hookMethod(method, callback);
+                        hooked = true;
+                    }
+                    catch (Throwable t)
+                    {
+                        log("mmg", "hookMethod " + current.getName() + "#" + methodName + " gagal: " + t);
+                    }
+                }
+            }
+            catch (Throwable ignored)
+            {
+            }
+
+            current = current.getSuperclass();
+        }
+
+        return hooked;
+    }
+
+    /**
+     * Semua nama method yang dideklarasikan di kelas ini dan kelas dasarnya.
+     * <p>
+     * Dipakai untuk menyaring sebelum memasang hook. {@code captureAdListener}
+     * mencoba belasan nama setter pada setiap kelas SDK, dan tanpa saringan ini
+     * setiap nama yang tidak ada tetap menelusuri seluruh hierarki kelas lewat
+     * refleksi. Pada aplikasi yang memuat banyak SDK (MiChat: TradPlus,
+     * AppLovin, ironSource, Mintegral, Pangle, Facebook, GMS) itu berarti
+     * ratusan penelusuran hierarki yang semuanya berakhir kosong, dan biayanya
+     * dibayar saat proses aplikasi dibuat.
+     * <p>
+     * Hierarki dihentikan di kelas framework, sama seperti
+     * {@link #hookHierarchy}: {@code getDeclaredMethods()} pada kelas Android
+     * mahal dan tidak pernah berisi setter listener iklan.
+     */
+    public static Set<String> methodNamesInHierarchy(Class<?> clazz)
+    {
+        Set<String> cached = sMethodNames.get(clazz);
+        if (cached != null)
+        {
+            return cached;
+        }
+        Set<String> names = new java.util.HashSet<>();
+        Class<?> current = clazz;
+        for (int depth = 0; current != null && depth < 8; depth++)
+        {
+            if (current.getClassLoader() == null)
+            {
+                break;
+            }
+            try
+            {
+                for (Method method : current.getDeclaredMethods())
+                {
+                    names.add(method.getName());
+                }
+            }
+            catch (Throwable ignored)
+            {
+            }
+            current = current.getSuperclass();
+        }
+        sMethodNames.put(clazz, names);
+        return names;
+    }
+
+    /** Hasil {@link #methodNamesInHierarchy} per kelas. */
+    private static final Map<Class<?>, Set<String>> sMethodNames =
+            Collections.synchronizedMap(new WeakHashMap<Class<?>, Set<String>>());
+
+    /** Nama method beserta tipe parameternya, untuk mencocokkan overload. */
+    private static String signatureOf(Method method)    {
+        StringBuilder builder = new StringBuilder(method.getName());
+        builder.append('(');
+        Class<?>[] types = method.getParameterTypes();
+        for (int i = 0; i < types.length; i++)
+        {
+            if (i > 0)
+            {
+                builder.append(',');
+            }
+            builder.append(types[i].getName());
+        }
+        builder.append(')');
+        return builder.toString();
+    }
+
+    /**
+     * Method yang hanya <em>melaporkan status</em> ({@code isReady},
+     * {@code isEnabled}, {@code getLoadedCount}) tidak boleh dihitung sebagai
+     * iklan yang diblokir.
+     * <p>
+     * Versi sebelumnya menaikkan hitungan untuk setiap panggilan seperti itu;
+     * aplikasi yang menanyakan kesiapan iklan berulang kali (hal biasa pada
+     * alur reward) membuat angka statistik membengkak tanpa ada satu iklan pun
+     * yang benar-benar dicegah.
+     */
+    public static boolean isStateQuery(String methodName)
+    {
+        if (methodName == null || methodName.isEmpty())
+        {
+            return false;
+        }
+        return methodName.startsWith("is")
+                || methodName.startsWith("get")
+                || methodName.startsWith("has")
+                || methodName.startsWith("can")
+                || methodName.startsWith("should");
+    }
+
+    /**
+     * Setter/listener pendaftaran ({@code setAdListener},
+     * {@code registerViewForInteraction}) bukan aksi menampilkan iklan.
+     */
+    public static boolean isCallbackSetter(String methodName)
+    {
+        if (methodName == null || methodName.isEmpty())
+        {
+            return false;
+        }
+        return methodName.startsWith("set")
+                || methodName.startsWith("register")
+                || methodName.startsWith("add");
+    }
+
+    /** True bila panggilan method ini layak dihitung sebagai satu blokir. */
+    public static boolean countsAsBlock(String methodName)
+    {
+        return !isStateQuery(methodName) && !isCallbackSetter(methodName);
+    }
+
+    /**
+     * Method yang <em>memuat</em> iklan.
+     * <p>
+     * Hanya jalur muat yang butuh notifikasi callback gagal-muat: aplikasi
+     * menunggu {@code onAdLoaded}/{@code onAdFailedToLoad} setelah memanggil
+     * method ini.
+     * <p>
+     * Awalan {@code init} ikut dihitung karena sebagian mediator menamai
+     * pemuatannya begitu: ironSource memakai {@code initInterstitial},
+     * {@code initRewardedVideoWithCallback}, dan {@code initBanners}. Tanpa itu
+     * method tersebut diblokir tanpa pernah memberi kabar, dan adapter yang
+     * menunggu callback tetap menggantung.
+     */
+    public static boolean isLoadPath(String methodName)
+    {
+        if (methodName == null || methodName.isEmpty())
+        {
+            return false;
+        }
+        String lower = methodName.toLowerCase(java.util.Locale.US);
+        return lower.contains("load")
+                || lower.equals("request")
+                || lower.equals("preload")
+                || lower.startsWith("init");
+    }
+
+    /**
+     * Method yang <em>menampilkan</em> iklan.
+     * <p>
+     * Ini pun perlu notifikasi, tetapi dengan callback gagal-tampil yang
+     * berbeda. Aplikasi menunggu {@code onAdClosed}/{@code onAdReward} setelah
+     * memanggil {@code show()}; bila method itu diblokir tanpa kabar, layar
+     * reward tetap terbuka dan pengguna melihat putaran tanpa ujung.
+     */
+    public static boolean isShowPath(String methodName)
+    {
+        if (methodName == null || methodName.isEmpty())
+        {
+            return false;
+        }
+        String lower = methodName.toLowerCase(java.util.Locale.US);
+        return lower.startsWith("show") || lower.startsWith("present");
     }
 
     /**

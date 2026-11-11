@@ -200,13 +200,17 @@ public final class NameBlocking
                 if (isAdView(pkgName, view))
                 {
                     Util.log(pkgName, "addView: " + view.getClass().getName());
-                    ViewBlocking.removeAdView(pkgName, view);
                     // Jangan tambahkan view iklan sama sekali, sehingga parent
                     // tidak perlu menata ulang tata letak untuknya.
-                    if (view.getParent() == null)
-                    {
-                        param.setResult(null);
-                    }
+                    //
+                    // setResult(null) dipakai apa pun status parent-nya:
+                    // ViewGroup.addView menambahkan view ke parent-nya sendiri,
+                    // jadi view yang masih punya parent lain akan tetap
+                    // ditambahkan ke parent yang sedang diproses — iklan tetap
+                    // muncul. Memanggil removeAdView() di sini juga memicu
+                    // requestLayout saat addView sedang berjalan, yang pada
+                    // beberapa aplikasi berujung layout berulang tanpa henti.
+                    param.setResult(null);
                 }
             }
         });
@@ -223,7 +227,7 @@ public final class NameBlocking
                 }
                 View decor = activity.getWindow().getDecorView();
                 View root = decor.findViewById(android.R.id.content);
-                clearAdViewInLayout(pkgName, root != null ? root : decor);
+                checkTreeOnce(pkgName, root != null ? root : decor);
             }
         });
 
@@ -237,11 +241,54 @@ public final class NameBlocking
                 Object result = param.getResult();
                 if (result instanceof View)
                 {
-                    // Hanya root hasil inflate yang diperiksa: menelusuri
-                    // seluruh subview di setiap inflate membuat startup lambat.
-                    clearAdViewInLayout(pkgName, (View) result, 0);
+                    // addView sudah memeriksa setiap view yang dipasang; di
+                    // sini cukup view root-nya. Menelusuri seluruh subtree
+                    // pada setiap inflate membuat daftar panjang seperti
+                    // RecyclerView memicu ribuan pemeriksaan per frame —
+                    // terasa sebagai UI yang berputar dan boros CPU.
+                    View root = (View) result;
+                    if (isAdView(pkgName, root))
+                    {
+                        ViewBlocking.removeAdView(pkgName, root);
+                    }
                 }
             }
         });
+    }
+
+    /**
+     * Menelusuri pohon view satu kali per root, hanya setelah
+     * {@code setContentView}.
+     * <p>
+     * Sebelumnya setiap {@code inflate} menelusuri seluruh subtree hingga 64
+     * tingkat. Pada layar dengan banyak item itu menjadi pekerjaan berulang
+     * untuk pohon yang sama, dan {@code removeAdView} yang dipanggil di
+     * tengahnya memicu {@code requestLayout} lagi — sumber putaran yang
+     * dilaporkan pada alur iklan reward.
+     */
+    private static void checkTreeOnce(String packageName, View root)
+    {
+        if (root == null)
+        {
+            return;
+        }
+        synchronized (sScannedTrees)
+        {
+            if (sScannedTrees.put(root, Boolean.TRUE) != null)
+            {
+                return;
+            }
+        }
+        clearAdViewInLayout(packageName, root, 0);
+    }
+
+    /** Root yang sudah ditelusuri; WeakHashMap agar tidak menahan view. */
+    private static final java.util.Map<View, Boolean> sScannedTrees =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<View, Boolean>());
+
+    /** Membersihkan penanda saat hook dipasang untuk proses baru. */
+    public static void reset()
+    {
+        sScannedTrees.clear();
     }
 }

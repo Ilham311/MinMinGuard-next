@@ -7,18 +7,28 @@ import tw.fatminmin.xposed.minminguard.next.blocker.Blocker;
 /**
  * Pangle / ByteDance (kelas SDK: {@code com.bytedance.sdk.openadsdk}).
  * <p>
- * Nama kelas inti stabil sejak SDK 3.x, jadi pemblokiran berbasis API bisa
- * dipakai di samping pencocokan prefix untuk view yang di-obfuscate.
+ * APK sungguhan hanya memuat <em>API PAG</em> modern
+ * ({@code com.bytedance.sdk.openadsdk.api.*}) dan tidak lagi memuat API lama
+ * {@code TTAdNative}/{@code TTRewardVideoAd}/{@code TTInterstitialAd}. Hook
+ * versi sebelumnya menargetkan kelas lama itu, sehingga tidak satu pun hook
+ * terpasang dan blokir Pangle sepenuhnya tidak berfungsi.
+ * <p>
+ * {@code loadAd(String, Request, LoadCallback)} adalah method statis konkret
+ * pada setiap kelas PAG, dan callback-nya diterima langsung sebagai argumen.
+ * Itulah satu-satunya titik yang bisa di-hook: seluruh kelas PAG abstrak
+ * ({@code flags=0x401}) sehingga {@code show()} dan setter listener-nya tidak
+ * punya badan untuk dipasangi hook. Memblokir {@code loadAd} sudah cukup —
+ * tanpa iklan termuat, {@code show()} tidak punya apa pun untuk ditampilkan.
  */
 public class Pangle extends Blocker
 {
     public static final String BANNER_PREFIX = "com.bytedance.sdk.openadsdk";
 
-    private static final String TT_AD_NATIVE = "com.bytedance.sdk.openadsdk.TTNativeAd";
-    private static final String TT_AD = "com.bytedance.sdk.openadsdk.TTAdNative";
-    private static final String TT_FULL_SCREEN = "com.bytedance.sdk.openadsdk.TTFullScreenVideoAd";
-    private static final String TT_REWARD_VIDEO = "com.bytedance.sdk.openadsdk.TTRewardVideoAd";
-    private static final String TT_INTERSTITIAL = "com.bytedance.sdk.openadsdk.TTInterstitialAd";
+    private static final String PAG_BANNER = "com.bytedance.sdk.openadsdk.api.banner.PAGBannerAd";
+    private static final String PAG_INTERSTITIAL = "com.bytedance.sdk.openadsdk.api.interstitial.PAGInterstitialAd";
+    private static final String PAG_REWARDED = "com.bytedance.sdk.openadsdk.api.reward.PAGRewardedAd";
+    private static final String PAG_APP_OPEN = "com.bytedance.sdk.openadsdk.api.open.PAGAppOpenAd";
+    private static final String PAG_NATIVE = "com.bytedance.sdk.openadsdk.api.nativeAd.PAGNativeAd";
 
     @Override
     public String getBanner()
@@ -37,19 +47,13 @@ public class Pangle extends Blocker
     {
         boolean result = false;
 
-        // Semua iklan ByteDance dimuat lewat facade TTAdNative.
-        result |= ApiBlocking.blockAdFunction(packageName, TT_AD, "loadFeedAd", lpparam);
-        result |= ApiBlocking.blockAdFunction(packageName, TT_AD, "loadBannerExpressAd", lpparam);
-        result |= ApiBlocking.blockAdFunction(packageName, TT_AD, "loadNativeExpressAd", lpparam);
-        result |= ApiBlocking.blockAdFunction(packageName, TT_AD, "loadSplashAd", lpparam);
-        result |= ApiBlocking.blockAdFunction(packageName, TT_AD, "loadFullScreenVideoAd", lpparam);
-        result |= ApiBlocking.blockAdFunction(packageName, TT_AD, "loadRewardVideoAd", lpparam);
-        result |= ApiBlocking.blockAdFunction(packageName, TT_AD, "loadInteractionExpressAd", lpparam);
-
-        result |= ApiBlocking.blockAdFunction(packageName, TT_AD_NATIVE, "registerViewForInteraction", lpparam);
-        result |= ApiBlocking.blockAdFunction(packageName, TT_FULL_SCREEN, "show", lpparam);
-        result |= ApiBlocking.blockAdFunction(packageName, TT_REWARD_VIDEO, "show", lpparam);
-        result |= ApiBlocking.blockAdFunction(packageName, TT_INTERSTITIAL, "show", lpparam);
+        // Callback muat diterima langsung sebagai argumen, jadi AdCallbacks
+        // bisa mengirim PAGLoadCallback#onError tanpa penangkapan tambahan.
+        result |= ApiBlocking.blockAdLoad(packageName, PAG_REWARDED, "loadAd", lpparam);
+        result |= ApiBlocking.blockAdLoad(packageName, PAG_INTERSTITIAL, "loadAd", lpparam);
+        result |= ApiBlocking.blockAdLoad(packageName, PAG_APP_OPEN, "loadAd", lpparam);
+        result |= ApiBlocking.blockAdLoad(packageName, PAG_BANNER, "loadAd", lpparam);
+        result |= ApiBlocking.blockAdLoad(packageName, PAG_NATIVE, "loadAd", lpparam);
 
         return result;
     }

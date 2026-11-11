@@ -32,7 +32,7 @@ The project has been modernised (AGP 8.13 / Gradle 8.13, compileSdk 36, Java 17)
 
 Notes:
 
-- The module `applicationId` is `tw.fatminmin.xposed.minminguard.next` (version 3.1.2, versionCode 75). Xposed/LSPosed scope strings and the `assets/xposed_init` entry refer to this package.
+- The module `applicationId` is `tw.fatminmin.xposed.minminguard.next` (version 3.1.3, versionCode 76). Xposed/LSPosed scope strings and the `assets/xposed_init` entry refer to this package.
 - `de.robv.android.xposed:api:82` is resolved from `https://api.xposed.info/` (jcenter is gone).
 - If you point the build at a local SDK, put `sdk.dir=` in `local.properties` (git-ignored).
 
@@ -84,6 +84,91 @@ root, so the module reports itself instead: every process it hooks writes one
 row to `content://tw.fatminmin.xposed.minminguard.next/active`. An app therefore
 appears the first time it is opened after being added to scope. *Forget app
 list* clears those rows without deleting statistics.
+
+## What changed in 3.1.3
+
+A blocking fix for rewarded ads (Spotify, MiChat and others) where the reward
+screen span forever. Every cause below was confirmed against the real MiChat
+APK rather than guessed.
+
+**The reward spinner had five independent causes**
+
+- *Callbacks were never notified.* `load()` was blocked and the SDK's callback
+  was never invoked, so the app waited for an `onAdLoaded` /
+  `onAdFailedToLoad` that could not arrive. Blocking now goes through
+  `AdCallbacks`, and `blockAdLoad`, `blockAdFunction`, `blockAdFunctionExact`
+  and `removeBanner` all report the failure.
+- *Blocked `show()` was silent.* After `show()` was blocked nothing told the app
+  the ad had closed, so the reward screen stayed open. A separate dismiss path
+  now answers with the close callback.
+- *`show()` is abstract on AdMob.* `XposedBridge.hookAllMethods` throws for
+  abstract methods and aborts every remaining overload, so the hook was never
+  installed on `RewardedAd`/`InterstitialAd`/`AppOpenAd`. Hooks now skip
+  abstract overloads individually.
+- *Inherited methods were never hooked.* `hookAllMethods` only reads
+  `getDeclaredMethods()`. The hook installer now walks the class hierarchy, which
+  is what makes `BaseAdView#loadAd`, `NativeAdBase#loadAd` and
+  `NonBidAdHandler#load` reachable at all.
+- *A rate limiter dropped real answers.* Notifications arriving less than 250 ms
+  apart were discarded. An app that reloads immediately after a failure got its
+  second answer thrown away and waited forever. The limiter now only prevents
+  duplicates within a single block; retries always get their own answer, with an
+  exponential delay that decays after 30 seconds of quiet.
+
+**Callback names that did not exist**
+
+The dismiss list only knew `onAdClosed`/`onAdDismissed`. The listeners actually
+bundled in MiChat use different names, so those SDKs never received anything:
+
+| SDK | Real close callback | Real show-failure callback |
+| --- | --- | --- |
+| AppLovin MAX | `onAdHidden` | `onAdDisplayFailed` |
+| Vungle | `onAdEnd` | `onAdFailedToPlay` |
+| Unity Ads | `onUnityAdsShowComplete` | `onUnityAdsShowFailure` |
+| AdMob | `onAdDismissedFullScreenContent` | `onAdFailedToShowFullScreenContent` |
+
+Each name was verified to exist in the APK's own listener classes; the
+show-failure names are used as a fallback when a listener has no close callback.
+
+**Methods that are overridden in subclasses**
+
+Hierarchy walking goes upward, so a method *overridden* in a subclass is never
+hooked. Confirmed cases that left ads loading:
+
+- `BaseFullscreenAd#load` overrides `BaseAd#load` — Vungle reward loaded anyway.
+- `IronSourceAdapter` overrides 11 methods of `AbstractAdapter` — ironSource's
+  own ads loaded even with every base hook installed.
+- `AdManagerInterstitialAd#load` overrides `InterstitialAd#load`.
+
+These subclasses are now hooked explicitly.
+
+**Wrong or incomplete SDK targets**
+
+- Vungle: the blocker targeted `com.vungle.warren.Vungle`, `...Storage` and
+  `com.vungle.publisher.VunglePub` — none of which exist in modern SDKs, so
+  Vungle was never blocked at all. Rewritten for `com.vungle.ads.*`.
+- **LevelPlay was not covered at all.** MiChat's reward ads go through
+  ironSource's newer `LevelPlay` API (`com.unity3d.mediation.*`), whose ad
+  classes do not extend the old `com.ironsource.*` classes. Every hook in
+  `Ironsource.java` therefore missed them, so `loadAd()` was never blocked and
+  the reward screen waited for a load callback that could never arrive — the
+  spinner itself. A dedicated `LevelPlay` blocker now hooks
+  `LevelPlayRewardedAd`, `LevelPlayInterstitialAd` and `LevelPlayBannerAdView`,
+  captures `setListener`/`setBannerListener`, and answers with `onAdLoadFailed`
+  or `onAdClosed`.
+- `setFullScreenContentCallback`, `setRewardListener`, `setNativeAdListener` and
+  `setSplashListener` were missing from the listener setter list. `setBannerListener`
+  (LevelPlay) was added for the same reason.
+- Blocking now pre-checks which methods a class actually has. Every process used
+  to walk the class hierarchy for dozens of methods that did not exist there.
+
+**Spotify is different**
+
+Spotify bundles no third-party ad SDK. Its audio/video ads are served by
+Spotify's own player, so SDK-level blocking cannot remove them. This module
+does not claim otherwise; the ad-removal layers here cover apps that embed
+AdMob, AppLovin/MAX, ironSource, TradPlus, Pangle, Mintegral, Facebook, Unity
+Ads, Vungle, InMobi, Fyber and friends.
 
 ## What changed in 3.1.2
 

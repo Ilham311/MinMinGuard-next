@@ -61,11 +61,22 @@ public class ViewBlocking
 
             // LayoutParams sering belum final saat hook berjalan; ulangi sekali
             // setelah layout selesai.
+            //
+            // Ditunda lewat post() milik view itu sendiri, tetapi hanya bila
+            // view masih terpasang. View yang sudah dilepas tidak akan pernah
+            // menjalankan runnable-nya, dan memanggil collapse() pada view
+            // tanpa parent justru mengubah LayoutParams lalu memicu
+            // requestLayout pada pohon yang sedang dibuang — salah satu sumber
+            // layout berulang yang membuat aplikasi terasa berputar.
             view.post(new Runnable()
             {
                 @Override
                 public void run()
                 {
+                    if (view.getParent() == null)
+                    {
+                        return;
+                    }
                     float heightDp = convertPixelsToDp(view.getContext(), view.getHeight());
                     if (first || (heightDp > 0 && heightDp <= MAX_AD_HEIGHT_DP))
                     {
