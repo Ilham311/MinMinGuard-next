@@ -12,10 +12,14 @@ android {
 
     signingConfigs {
         release {
-            keyAlias 'minminguard'
-            keyPassword System.getenv("KEYSTORE_PASS")
-            storeFile file('minminguard.keystore')
-            storePassword System.getenv("KEY_PASS")
+            // CI writes the keystore decoded from the KEYSTORE_BASE64 secret to
+            // $RUNNER_TEMP and points KEYSTORE_PATH at it; local builds fall
+            // back to the checked-in keystore.
+            def keystorePath = System.getenv("KEYSTORE_PATH")
+            storeFile keystorePath ? file(keystorePath) : file('minminguard.keystore')
+            storePassword System.getenv("KEYSTORE_PASS")
+            keyAlias System.getenv("KEY_ALIAS") ?: 'minminguard'
+            keyPassword System.getenv("KEY_PASS")
         }
         debug {
             storeFile file("debug.keystore")
@@ -38,6 +42,7 @@ android {
         release {
             // zipalign is applied automatically by AGP for release builds
             // (zipAlignEnabled was removed from the DSL in AGP 9)
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
         }

@@ -34,8 +34,36 @@ Notes:
 
 - The module `applicationId` is `tw.fatminmin.xposed.minminguard.next` (version 3.0.0, versionCode 72). Xposed/LSPosed scope strings and the `assets/xposed_init` entry refer to this package.
 - `de.robv.android.xposed:api:82` is resolved from `https://api.xposed.info/` (jcenter is gone).
-- Release builds read the keystore passwords from the `KEYSTORE_PASS` / `KEY_PASS` environment variables and use `app/minminguard.keystore`.
 - If you point the build at a local SDK, put `sdk.dir=` in `local.properties` (git-ignored).
+
+### Signing
+
+Release builds are signed with the keystore named by `KEYSTORE_PATH` (or the
+checked-in `app/minminguard.keystore` when unset), using `KEYSTORE_PASS`,
+`KEY_PASS` and `KEY_ALIAS`:
+
+```bash
+export KEYSTORE_PATH=/path/to/minminguard.keystore
+export KEYSTORE_PASS='...'   # store password
+export KEY_PASS='...'        # key password
+export KEY_ALIAS=minminguard # optional, defaults to "minminguard"
+./gradlew assembleRelease
+```
+
+The `Build APK` workflow does this automatically. It needs four repository
+secrets (`Settings → Secrets and variables → Actions`):
+
+| Secret | Contents |
+| --- | --- |
+| `KEYSTORE_BASE64` | `base64 -w0 minminguard.keystore` |
+| `KEYSTORE_PASS` | keystore (store) password |
+| `KEY_PASS` | key password |
+| `KEY_ALIAS` | key alias, e.g. `minminguard` |
+
+The release job decodes the keystore into `$RUNNER_TEMP`, verifies the
+resulting APK with `apksigner`, and deletes the keystore afterwards. Pull
+requests build the debug APK only, because secrets are not exposed to them.
+
 
 ### Adding a new ad network into support
 
