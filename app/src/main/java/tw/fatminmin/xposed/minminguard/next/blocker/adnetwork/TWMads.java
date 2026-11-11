@@ -16,7 +16,7 @@ public class TWMads extends Blocker
         boolean result = false;
 
         //TODO Does this need to use removeBanner?
-        result = ApiBlocking.removeBanner(packageName, BANNER, "activeAd", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "activeAd", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "loadAd", lpparam);
 
         return result;

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_search">Cari</string>
+    <string name="action_settings">Pengaturan</string>
+    <string name="action_statistics">Statistik</string>
+    <string name="action_tutorial">Panduan</string>
+    <string name="action_about">Tentang / Bantuan</string>
+    <string name="action_donate">Donasi</string>
+
+    <string name="intro_auto_title">Mode otomatis</string>
+    <string name="intro_auto_content">Mode otomatis memblokir iklan di semua aplikasi di perangkat Anda.</string>
+    <string name="intro_manual_title">Mode manual</string>
+    <string name="intro_manual_content">Pilih sendiri aplikasi yang iklannya ingin diblokir (lewat sakelar).</string>
+    <string name="intro_tap_icon_title">Ketuk ikon aplikasi</string>
+    <string name="intro_tap_icon_content">Ketuk ikon untuk memulai ulang aplikasi tersebut.</string>
+    <string name="intro_app_detail_title">Lihat statistik aplikasi</string>
+    <string name="intro_app_detail_content">Ketuk nama aplikasi untuk melihat statistik pemblokiran.</string>
+    <string name="intro_url_filtering_title">Penyaringan URL</string>
+    <string name="intro_url_filtering_content">Jika iklan masih muncul, coba aktifkan penyaringan URL. Fitur ini bisa mengganggu aplikasi yang berbasis WebView.</string>
+
+    <string name="btn_ok">OKE</string>
+
+    <string name="msg_xposed_not_enabled">Xposed tidak aktif</string>
+    <string name="msg_runtime">Framework: %1$s | Root: %2$s</string>
+    <string name="msg_enabled_crash_report">Aktifkan laporan crash</string>
+    <string name="msg_show_system_apps">Tampilkan aplikasi sistem</string>
+    <string name="msg_show_debug">Tampilkan info debug di log Xposed</string>
+    <string name="msg_show_launcher_icon">Tampilkan ikon peluncur</string>
+    <string name="msg_mode_apply">Terapkan</string>
+    <string name="msg_mode_applied">Mode %1$s diterapkan</string>
+    <string name="msg_block_num">%d iklan diblokir</string>
+    <string name="msg_ad_networks">Jaringan iklan:</string>
+    <string name="msg_ads_blocked">Iklan diblokir:</string>
+    <string name="msg_not_detected">Tidak terdeteksi</string>
+    <string name="msg_wait">Mohon tunggu&#8230;</string>
+    <string name="msg_app_launch_fail">Aplikasi ini tidak dapat dijalankan</string>
+    <string name="msg_batch_done">%1$d aplikasi diperbarui</string>
+    <string name="msg_config_exported">Konfigurasi diekspor</string>
+    <string name="msg_config_export_failed">Ekspor gagal</string>
+    <string name="msg_config_imported">Konfigurasi diimpor</string>
+    <string name="msg_config_import_failed">Impor gagal: berkas tidak valid</string>
+
+    <string name="mode_info_title">Cara kerja mode ini</string>
+    <string name="mode_info_auto">Pemblokiran iklan diterapkan otomatis ke semua aplikasi memakai aturan bawaan untuk jaringan iklan dan SDK iklan yang dikenal. Tidak perlu pengaturan apa pun — cukup aktifkan modul lalu reboot.</string>
+    <string name="mode_info_blacklist">Hanya aplikasi yang Anda aktifkan yang diblokir; sisanya tidak disentuh. Gunakan mode ini bila Anda hanya ingin memblokir iklan di beberapa aplikasi tertentu.</string>
+    <string name="mode_info_whitelist">Hanya aplikasi yang Anda aktifkan yang dibiarkan menampilkan iklan; sisanya diblokir. Gunakan mode ini untuk mempertahankan iklan di aplikasi yang Anda dukung.</string>
+
+    <string name="batch_selected">%1$d dipilih</string>
+    <string name="batch_select_all">Pilih semua</string>
+    <string name="batch_deselect_all">Batalkan pilihan semua</string>
+    <string name="batch_enable">Aktifkan</string>
+    <string name="batch_disable">Nonaktifkan</string>
+    <string name="batch_close">Tutup</string>
+
+    <string name="setting_theme">Tema</string>
+    <string name="setting_theme_system">Ikuti sistem</string>
+    <string name="setting_theme_light">Terang</string>
+    <string name="setting_theme_dark">Gelap</string>
+    <string name="setting_sort">Urutkan aplikasi menurut</string>
+    <string name="setting_sort_name">Nama aplikasi</string>
+    <string name="setting_sort_package">Nama paket</string>
+    <string name="setting_sort_blocked">Jumlah iklan diblokir</string>
+    <string name="setting_user_prefixes">Prefiks kelas iklan khusus</string>
+    <string name="setting_user_prefixes_hint">Satu prefiks nama kelas per baris, mis.
+com.example.adnetwork
+View dari kelas yang cocok akan dianggap iklan.</string>
+    <string name="setting_export_config">Ekspor konfigurasi</string>
+    <string name="setting_import_config">Impor konfigurasi</string>
+
+    <string name="stats_total_blocked">Total iklan diblokir</string>
+    <string name="stats_top_apps">Aplikasi teratas</string>
+    <string name="stats_top_networks">Jaringan iklan teratas</string>
+    <string name="stats_apps_count">%1$d aplikasi</string>
+    <string name="stats_hits_count">%1$d blokir</string>
+    <string name="stats_networks_count">%1$d jaringan</string>
+    <string name="stats_empty">Belum ada data pemblokiran. Buka dulu aplikasi yang menampilkan iklan, lalu periksa lagi nanti.</string>
+
+    <string name="nav_title">Menu</string>
+    <string name="option_enable_url_filter">Aktifkan penyaringan URL</string>
+    <string name="option_enable_dns_filter">Aktifkan pemblokiran DNS (eksperimental)</string>
+    <string name="option_enable_whitelist">Biarkan iklan di aplikasi ini (whitelist)</string>
+
+    <string name="detail_last_seen">Iklan terakhir diblokir</string>
+    <string name="detail_never_seen">Belum pernah</string>
+    <string name="detail_no_networks">Tidak terdeteksi</string>
+    <string name="detail_clear_stats">Hapus statistik aplikasi ini</string>
+    <string name="detail_clear_stats_confirm">Hapus statistik pemblokiran aplikasi ini?</string>
+    <string name="detail_stats_cleared">Statistik aplikasi ini dihapus</string>
+    <string name="detail_toggles_hint">Sakelar ini berlaku saat aplikasi dijalankan ulang.</string>
+
+    <string name="setting_heuristic">Deteksi view iklan dari nama kelas (heuristik)</string>
+    <string name="setting_verbose">Log detail di log Xposed</string>
+    <string name="setting_reset_stats">Reset statistik</string>
+    <string name="setting_reset_stats_confirm">Hapus semua statistik pemblokiran? Tindakan ini tidak bisa dibatalkan.</string>
+    <string name="msg_stats_reset">Statistik dihapus</string>
+    <string name="msg_prefixes_saved">Prefiks khusus disimpan</string>
+    <string name="msg_restart_hint">Buka ulang aplikasi target agar perubahan berlaku</string>
+    <string name="msg_empty_list">Tidak ada aplikasi yang cocok dengan filter</string>
+</resources>

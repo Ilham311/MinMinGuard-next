@@ -15,7 +15,7 @@ public class Appnext extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.blockAdFunction(packageName, INTER_ADS, "loadAd", lpparam);
+        result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "loadAd", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "showAd", lpparam);
 
         result |= ApiBlocking.blockAdFunction(packageName, VIDEO_ADS, "loadAd", lpparam);

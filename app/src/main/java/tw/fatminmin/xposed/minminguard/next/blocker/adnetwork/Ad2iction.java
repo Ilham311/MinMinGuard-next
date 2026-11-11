@@ -15,7 +15,7 @@ public class Ad2iction extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "loadAd", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "loadAd", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "load", lpparam);
 
         return result;

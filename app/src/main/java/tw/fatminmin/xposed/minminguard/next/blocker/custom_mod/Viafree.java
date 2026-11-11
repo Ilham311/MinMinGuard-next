@@ -1,7 +1,6 @@
 package tw.fatminmin.xposed.minminguard.next.blocker.custom_mod;
 
 import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import tw.fatminmin.xposed.minminguard.next.blocker.Util;
 
@@ -25,12 +24,19 @@ public final class Viafree
             return false;
         }
 
-        XposedHelpers.findAndHookMethod(className, lpparam.classLoader, method, new XC_MethodHook()
+        if (Util.findClassOrNull(className, lpparam.classLoader) == null)
+        {
+            return false;
+        }
+
+        Util.hookAllMethods(className, lpparam.classLoader, method, new XC_MethodHook()
         {
             @Override
             protected void beforeHookedMethod(MethodHookParam param)
             {
-                param.setResult(new ArrayList<Object>());
+                // Hasil diisi menurut tipe balik method; setResult(Object)
+                // pada method primitif/void memicu ClassCastException.
+                Util.setResultCompat(param, new ArrayList<Object>());
                 Util.notifyRemoveAdView(null, packageName, 1);
             }
         });

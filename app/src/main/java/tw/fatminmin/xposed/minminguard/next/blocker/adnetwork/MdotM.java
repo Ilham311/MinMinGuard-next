@@ -17,7 +17,7 @@ public class MdotM extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "loadBannerAd", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "loadBannerAd", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "loadInterstitial", lpparam);
 
         return result;

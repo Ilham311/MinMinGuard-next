@@ -3,7 +3,6 @@ package tw.fatminmin.xposed.minminguard.next.ui.adapter;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
-import android.database.sqlite.SQLiteDatabase;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -20,7 +19,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.card.MaterialCardView;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -28,14 +27,12 @@ import java.util.Set;
 
 import tw.fatminmin.xposed.minminguard.next.Common;
 import tw.fatminmin.xposed.minminguard.next.R;
-import tw.fatminmin.xposed.minminguard.next.orm.AppData;
-import tw.fatminmin.xposed.minminguard.next.orm.AppDataDao;
-import tw.fatminmin.xposed.minminguard.next.orm.DaoMaster;
-import tw.fatminmin.xposed.minminguard.next.orm.DaoSession;
+import tw.fatminmin.xposed.minminguard.next.data.StatsRepository;
 import tw.fatminmin.xposed.minminguard.next.ui.UIUtils;
 import tw.fatminmin.xposed.minminguard.next.ui.dialog.AppDetailDialogFragment;
 import tw.fatminmin.xposed.minminguard.next.ui.fragments.MainFragment;
 import tw.fatminmin.xposed.minminguard.next.ui.models.AppDetails;
+import tw.fatminmin.xposed.minminguard.next.ui.models.AppStats;
 
 /**
  * Created by fatminmin on 2015/10/1.
@@ -45,13 +42,9 @@ public class AppsAdapter extends RecyclerView.Adapter<AppsAdapter.ViewHolder>
 
     private final Context mContext;
     private final SharedPreferences mPref;
-    private final DaoMaster.DevOpenHelper helper;
-    private final SQLiteDatabase db;
-    private final DaoMaster daoMaster;
-    private final DaoSession daoSession;
-    private final AppDataDao appDataDao;
     private ArrayList<AppDetails> appList;
-    private Map<String, AppData> mAppDataMap; // retrieved AppData from sqlite
+    /** Statistik per paket; diambil sekali per daftar, bukan per baris. */
+    private Map<String, AppStats> mStats = Collections.emptyMap();
     private final MainFragment.FragmentMode mMode;
 
     private final Set<String> mSelected = new HashSet<>();
@@ -80,15 +73,7 @@ public class AppsAdapter extends RecyclerView.Adapter<AppsAdapter.ViewHolder>
 
         mPref = ctx.getSharedPreferences(Common.MOD_PREFS, Common.getPrefMode());
 
-        helper = new DaoMaster.DevOpenHelper(context, "mmg", null);
-        db = helper.getWritableDatabase();
-        daoMaster = new DaoMaster(db);
-        daoSession = daoMaster.newSession();
-        appDataDao = daoSession.getAppDataDao();
-
         mMode = mode;
-
-        mAppDataMap = new HashMap<>();
     }
 
     public void setOnSelectionChangedListener(OnSelectionChangedListener listener)
@@ -99,11 +84,6 @@ public class AppsAdapter extends RecyclerView.Adapter<AppsAdapter.ViewHolder>
     public void setOnSelectionModeListener(OnSelectionModeListener listener)
     {
         mModeListener = listener;
-    }
-
-    public boolean isSelectionMode()
-    {
-        return mSelectionMode;
     }
 
     public void setSelectionMode(boolean enabled)
@@ -167,32 +147,17 @@ public class AppsAdapter extends RecyclerView.Adapter<AppsAdapter.ViewHolder>
         return new ArrayList<>(mSelected);
     }
 
-    public int getSelectedCount()
+    /** Memuat ulang statistik saja (dipakai setelah data dihapus dari dialog). */
+    public void reloadStats()
     {
-        return mSelected.size();
+        mStats = StatsRepository.loadStats(mContext);
+        notifyDataSetChanged();
     }
 
     public void setAppList(ArrayList<AppDetails> list)
     {
         appList = list;
-
-        /* update appdata map */
-        mAppDataMap.clear();
-        for (AppDetails info : appList)
-        {
-            final String pkgName = info.getPackageName();
-            AppData appData = null;
-
-            List<AppData> results = appDataDao.queryBuilder().where(AppDataDao.Properties.PkgName.eq(pkgName)).list();
-
-            if (results.size() == 1)
-            {
-                appData = results.get(0);
-                appDataDao.refresh(appData);
-            }
-
-            mAppDataMap.put(pkgName, appData);
-        }
+        mStats = StatsRepository.loadStats(mContext);
     }
 
     @Override
@@ -228,7 +193,7 @@ public class AppsAdapter extends RecyclerView.Adapter<AppsAdapter.ViewHolder>
 
         final AppDetails currentAppDetails = appList.get(position);
 
-        final AppData appData = mAppDataMap.get(currentAppDetails.getPackageName());
+        final AppStats appData = mStats.get(currentAppDetails.getPackageName());
         if (appData != null && appData.getBlockNum() != 0)
         {
             holder.txtBlockNum.setText(mContext.getString(R.string.msg_block_num, appData.getBlockNum()));
@@ -294,8 +259,7 @@ public class AppsAdapter extends RecyclerView.Adapter<AppsAdapter.ViewHolder>
                 }
                 DialogFragment dialog = AppDetailDialogFragment.newInstance(currentAppDetails.getName(), currentAppDetails.getPackageName(), appData);
                 AppCompatActivity activity = (AppCompatActivity) mContext;
-                dialog.show(activity.getSupportFragmentManager(), "dialog");
-            }
+                dialog.show(activity.getSupportFragmentManager(), "dialog");            }
         });
 
         holder.card.setOnLongClickListener(new View.OnLongClickListener()

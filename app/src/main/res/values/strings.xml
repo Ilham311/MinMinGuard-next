@@ -72,9 +72,29 @@ Views from matching classes are treated as ads.</string>
     <string name="stats_top_apps">Top apps</string>
     <string name="stats_top_networks">Top ad networks</string>
     <string name="stats_apps_count">%1$d apps</string>
+    <string name="stats_hits_count">%1$d blocks</string>
     <string name="stats_networks_count">%1$d networks</string>
     <string name="stats_empty">No blocking data yet. Open some apps that show ads and check back later.</string>
 
     <string name="nav_title">Menu</string>
     <string name="option_enable_url_filter">Enable url filtering</string>
+    <string name="option_enable_dns_filter">Enable DNS blocking (experimental)</string>
+    <string name="option_enable_whitelist">Keep ads in this app (whitelist)</string>
+
+    <string name="detail_last_seen">Last ad blocked</string>
+    <string name="detail_never_seen">Never</string>
+    <string name="detail_no_networks">Not detected</string>
+    <string name="detail_clear_stats">Clear statistics for this app</string>
+    <string name="detail_clear_stats_confirm">Delete the blocking statistics of this app?</string>
+    <string name="detail_stats_cleared">Statistics for this app cleared</string>
+    <string name="detail_toggles_hint">These switches apply the next time the app starts.</string>
+
+    <string name="setting_heuristic">Detect ad views by class name (heuristics)</string>
+    <string name="setting_verbose">Verbose log in Xposed log</string>
+    <string name="setting_reset_stats">Reset statistics</string>
+    <string name="setting_reset_stats_confirm">Delete all blocking statistics? This cannot be undone.</string>
+    <string name="msg_stats_reset">Statistics cleared</string>
+    <string name="msg_prefixes_saved">Custom prefixes saved</string>
+    <string name="msg_restart_hint">Reopen the target app for changes to apply</string>
+    <string name="msg_empty_list">No apps match the current filter</string>
 </resources>

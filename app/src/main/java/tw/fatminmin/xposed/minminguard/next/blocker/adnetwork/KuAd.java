@@ -14,7 +14,7 @@ public class KuAd extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "setWSAdListener", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "setWSAdListener", lpparam);
         result |= ApiBlocking.removeBanner(packageName, BANNER, "setApplicationId", lpparam);
         result |= ApiBlocking.removeBanner(packageName, BANNER, "mediationLoadAd", lpparam);
 

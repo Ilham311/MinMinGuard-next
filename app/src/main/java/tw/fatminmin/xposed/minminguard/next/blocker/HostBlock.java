@@ -1,139 +1,111 @@
 package tw.fatminmin.xposed.minminguard.next.blocker;
 
-import android.util.Log;
-import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
-import de.robv.android.xposed.XposedHelpers;
-import de.robv.android.xposed.callbacks.XC_LoadPackage;
-import tw.fatminmin.xposed.minminguard.next.Main;
-
-import java.net.InetAddress;
 import java.net.UnknownHostException;
 
-@Deprecated
+import de.robv.android.xposed.XC_MethodHook;
+import de.robv.android.xposed.callbacks.XC_LoadPackage;
+
+/**
+ * Pemblokiran tingkat DNS (opt-in per aplikasi).
+ * <p>
+ * Bila host tujuan ada di daftar, resolusi nama digagalkan dengan
+ * {@link UnknownHostException}. SDK iklan menangani kegagalan ini sebagai
+ * "tidak ada koneksi", sehingga seluruh jalur (HTTP, HTTPS, socket mentah)
+ * tertutup tanpa perlu mengenali library yang dipakai.
+ * <p>
+ * Hanya dipasang pada aplikasi yang secara eksplisit mengaktifkannya, karena
+ * menggagalkan resolusi nama bisa memengaruhi fungsi selain iklan.
+ * <p>
+ * Kelas ini menggantikan versi lama yang {@code @Deprecated}, tidak pernah
+ * dipanggil, dan mencocokkan URL dengan 26 ribu pola.
+ */
 public final class HostBlock
 {
-
-    private static final String UNABLE_TO_RESOLVE_HOST = "Unable to resolve host";
-
-    public static void block(XC_LoadPackage.LoadPackageParam lpparam)
+    private HostBlock() throws InstantiationException
     {
+        throw new InstantiationException("This class is not for instantiation");
+    }
 
-        Class<?> inetAddrClz = XposedHelpers.findClass("java.net.InetAddress", lpparam.classLoader);
-        Class<?> inetSockAddrClz = XposedHelpers.findClass(" java.net.InetSocketAddress", lpparam.classLoader);
-        Class<?> socketClz = XposedHelpers.findClass("java.net.Socket", lpparam.classLoader);
-        Class<?> ioBridgeClz = XposedHelpers.findClass("libcore.io.IoBridge", lpparam.classLoader);
-
-        XposedBridge.hookAllConstructors(socketClz, new XC_MethodHook()
+    public static boolean install(final String packageName, XC_LoadPackage.LoadPackageParam lpparam)
+    {
+        if (Blocklist.get().size() == 0)
         {
-            @Override
-            protected void beforeHookedMethod(MethodHookParam param)
-            {
-                Object obj = param.args[0];
-                String host = "";
-                if (obj.getClass().getName().equals("java.lang.String"))
+            return false;
+        }
+
+        boolean hooked = false;
+
+        // Semua jalur resolusi publik bermuara pada dua method ini.
+        hooked |= hook("getByName", packageName, lpparam);
+        hooked |= hook("getAllByName", packageName, lpparam);
+
+        // Android 8+ memakai varian dengan parameter Network untuk query
+        // per-jaringan; signature-nya berbeda antar versi sehingga di-hook
+        // berdasarkan nama saja.
+        Util.hookAllMethods("java.net.InetAddress", lpparam.classLoader, "getByNameOnNet",
+                onNetHook(packageName));
+        Util.hookAllMethods("java.net.InetAddress", lpparam.classLoader, "getAllByNameOnNet",
+                onNetHook(packageName));
+
+        return hooked;
+    }
+
+    private static boolean hook(String methodName, final String packageName,
+                                XC_LoadPackage.LoadPackageParam lpparam)
+    {
+        return Util.hookMethod("java.net.InetAddress", lpparam.classLoader, methodName, new Object[]{
+                String.class,
+                new XC_MethodHook()
                 {
-                    host = (String) obj;
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable
+                    {
+                        if (param.args.length == 0 || !(param.args[0] instanceof String))
+                        {
+                            return;
+                        }
+                        // Dicek sebelum resolusi: kueri DNS untuk host iklan tidak
+                        // perlu dikirim ke jaringan sama sekali.
+                        String host = (String) param.args[0];
+                        if (isBlocked(packageName, host))
+                        {
+                            param.setThrowable(new UnknownHostException(host));
+                        }
+                    }
                 }
-                else if (obj.getClass().getName().equals("java.net.InetAddress"))
-                {
-                    host = ((InetAddress) obj).getHostName();
-                }
-                if (Main.patterns.contains(host))
-                {
-                    param.args[0] = null;
-                    param.setResult(new Object());
-                }
-            }
         });
+    }
 
-        XC_MethodHook inetAddrHookSingleResult = new XC_MethodHook()
+    private static XC_MethodHook onNetHook(final String packageName)
+    {
+        return new XC_MethodHook()
         {
             @Override
-            protected void beforeHookedMethod(MethodHookParam param)
+            protected void beforeHookedMethod(MethodHookParam param) throws Throwable
             {
-                String host = (String) param.args[0];
-
-                if (Main.patterns.contains(host))
+                if (param.args.length == 0 || !(param.args[0] instanceof String))
                 {
-                    Log.d("inet_before_host", host);
-                    param.setResult(new Object());
-                    param.setThrowable(new UnknownHostException(UNABLE_TO_RESOLVE_HOST));
+                    return;
                 }
-            }
-
-            @Override
-            protected void afterHookedMethod(MethodHookParam param)
-            {
                 String host = (String) param.args[0];
-
-                if (Main.patterns.contains(host))
+                if (isBlocked(packageName, host))
                 {
-                    Log.d("inet_after_host", host);
-                    param.setResult(new Object());
-                    param.setThrowable(new UnknownHostException(UNABLE_TO_RESOLVE_HOST));
+                    param.setThrowable(new UnknownHostException(host));
                 }
             }
         };
+    }
 
-        XposedBridge.hookAllMethods(inetAddrClz, "getByName", inetAddrHookSingleResult);
-        XposedBridge.hookAllMethods(inetAddrClz, "getByAddress", inetAddrHookSingleResult);
-        XposedBridge.hookAllMethods(inetAddrClz, "getAllByName", inetAddrHookSingleResult);
-
-        XposedBridge.hookAllMethods(inetSockAddrClz, "createUnresolved", inetAddrHookSingleResult);
-        XposedBridge.hookAllConstructors(inetSockAddrClz, new XC_MethodHook()
+    private static boolean isBlocked(String packageName, String host)
+    {
+        if (host == null || !Blocklist.get().isBlockedHost(host))
         {
-            @Override
-            protected void beforeHookedMethod(MethodHookParam param)
-            {
-                String host = (String) param.args[0];
-                if (Main.patterns.contains(host))
-                {
-                    Log.d("inet_before_host", host);
-                    param.args[0] = "localhost";
-                    param.setResult(new Object());
-                    param.setThrowable(new UnknownHostException(UNABLE_TO_RESOLVE_HOST));
-                }
-            }
-        });
+            return false;
+        }
 
-        // public static boolean connect(FileDescriptor fd, InetAddress inetAddress, int port) throws SocketException
-        // public static boolean connect(FileDescriptor fd, InetAddress inetAddress, int port, int timeoutMs) throws SocketException, SocketTimeoutException
-        // private static boolean connectErrno(FileDescriptor fd, InetAddress inetAddress, int port, int timeoutMs)
-        XC_MethodHook ioBridgeHook = new XC_MethodHook()
-        {
-            @Override
-            protected void beforeHookedMethod(MethodHookParam param)
-            {
-                InetAddress addr = (InetAddress) param.args[1];
-                String host = addr.getHostName();
-                String ip = addr.getHostAddress();
-
-                Log.d("fatminmin_iobridge", host + ":" + ip);
-
-                if (Main.patterns.contains(host) || Main.patterns.contains(ip))
-                {
-                    param.setResult(Boolean.valueOf(false));
-                    param.setThrowable(new UnknownHostException(UNABLE_TO_RESOLVE_HOST));
-                }
-            }
-
-            @Override
-            protected void afterHookedMethod(MethodHookParam param)
-            {
-                InetAddress addr = (InetAddress) param.args[1];
-                String host = addr.getHostName();
-                String ip = addr.getHostAddress();
-
-                if (Main.patterns.contains(host) || Main.patterns.contains(ip))
-                {
-                    param.setResult(Boolean.valueOf(false));
-                    param.setThrowable(new UnknownHostException(UNABLE_TO_RESOLVE_HOST));
-                }
-            }
-        };
-
-        XposedBridge.hookAllMethods(ioBridgeClz, "connect", ioBridgeHook);
-        XposedBridge.hookAllMethods(ioBridgeClz, "connectErrno", ioBridgeHook);
+        Util.log(packageName, "DNS diblokir: " + host);
+        Util.notifyRemoveAdView(null, packageName, 1);
+        Util.notifyAdNetwork(null, packageName, "DNS");
+        return true;
     }
 }

@@ -14,7 +14,7 @@ public class Bonzai extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "update", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "update", lpparam);
 
         return result;
     }

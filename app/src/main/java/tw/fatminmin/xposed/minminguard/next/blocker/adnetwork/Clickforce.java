@@ -18,7 +18,7 @@ public class Clickforce extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "show", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "show", lpparam);
 
         return result;
     }

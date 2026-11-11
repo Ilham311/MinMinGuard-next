@@ -28,7 +28,7 @@ public class Startapp extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.blockAdFunction(packageName, SDK, SDK_INIT, lpparam);
+        result |= ApiBlocking.blockAdFunction(packageName, SDK, SDK_INIT, lpparam);
         result |= ApiBlocking.removeBanner(packageName, BANNER, BANNER_FUNC, lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, NATIVE_AD, NATIVE_AD_FUNC, lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTER, INTER_FUNC1, lpparam);

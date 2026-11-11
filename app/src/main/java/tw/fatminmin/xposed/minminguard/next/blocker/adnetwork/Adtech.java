@@ -21,7 +21,7 @@ public class Adtech extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "load", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "load", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "load", lpparam);
 
         return result;

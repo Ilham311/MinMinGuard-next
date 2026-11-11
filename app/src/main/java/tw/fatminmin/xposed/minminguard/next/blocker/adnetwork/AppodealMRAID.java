@@ -15,7 +15,7 @@ public class AppodealMRAID extends Blocker {
     public boolean handleLoadPackage(String packageName, XC_LoadPackage.LoadPackageParam lpparam) {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "show", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "show", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName,AD_INTERSTITIAL,"show",lpparam);
 
         return result;

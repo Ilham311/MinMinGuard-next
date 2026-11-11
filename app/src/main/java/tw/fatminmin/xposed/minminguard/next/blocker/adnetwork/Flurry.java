@@ -16,7 +16,7 @@ public class Flurry extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "displayAd", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "displayAd", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, BANNER, "fetchAd", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, NATIVE_AD, "fetchAd", lpparam);
 

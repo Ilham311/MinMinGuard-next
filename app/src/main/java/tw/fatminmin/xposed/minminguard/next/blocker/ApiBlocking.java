@@ -1,310 +1,245 @@
 package tw.fatminmin.xposed.minminguard.next.blocker;
 
-import android.content.Context;
 import android.view.View;
+
 import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedHelpers;
-import de.robv.android.xposed.XposedHelpers.ClassNotFoundError;
+import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import tw.fatminmin.xposed.minminguard.next.Main;
 
 /**
- * Created by fatminmin on 2015/10/27.
+ * Pemblokiran berbasis API: memasang hook ke method milik SDK iklan sehingga
+ * iklan tidak pernah dimuat, apa pun UI-nya.
+ * <p>
+ * Semua primitive di sini mengembalikan {@code false} bila kelas/method tidak
+ * ada (SDK beda versi atau di-obfuscate) alih-alih melaporkan error.
  */
 public final class ApiBlocking
 {
-
-    public static void handle(final String packageName, final XC_LoadPackage.LoadPackageParam lpparam, final XC_MethodHook.MethodHookParam param)
+    private ApiBlocking() throws InstantiationException
     {
-        Context context = (Context) (param.thisObject);
+        throw new InstantiationException("This class is not for instantiation");
+    }
 
+    public static void handle(final String packageName, final XC_LoadPackage.LoadPackageParam lpparam)
+    {
         for (Blocker blocker : Main.blockers)
         {
             try
             {
-                String name = blocker.getClass().getSimpleName();
-                boolean result = blocker.handleLoadPackage(packageName, lpparam);
-
-                if (result)
+                if (blocker.handleLoadPackage(packageName, lpparam))
                 {
-                    Util.notifyAdNetwork(context, packageName, name);
+                    Util.notifyAdNetwork(null, packageName, blocker.getName());
                 }
             }
-            catch (Exception e)
+            catch (Throwable t)
             {
-                Util.log(packageName, e.toString());
+                Util.log(packageName, blocker.getName() + ": " + t);
             }
         }
     }
 
-    /*
-        Used for blocking banner function and removing banner
+    /**
+     * Menghapus banner dan mencegahnya dimuat kembali.
+     *
+     * @param bannerFunc nama method yang dipanggil SDK saat memasang iklan
      */
-    public static boolean removeBanner(final String packageName, final String bannerClass, final String bannerFunc, final XC_LoadPackage.LoadPackageParam lpparam)
+    public static boolean removeBanner(final String packageName, final String bannerClass,
+                                       final String bannerFunc, final XC_LoadPackage.LoadPackageParam lpparam)
     {
-        return removeBannerWithResult(packageName, bannerClass, bannerFunc, new Object(), lpparam);
+        return removeBannerWithResult(packageName, bannerClass, bannerFunc, null, lpparam);
     }
 
-    public static boolean removeBannerWithResult(final String packageName, final String bannerClass, final String bannerFunc, final Object result, final XC_LoadPackage.LoadPackageParam lpparam)
+    public static boolean removeBannerWithResult(final String packageName, final String bannerClass,
+                                                 final String bannerFunc, final Object result,
+                                                 final XC_LoadPackage.LoadPackageParam lpparam)
     {
-        try
+        final String blockerName = blockerNameOf(bannerClass);
+
+        return hookAll(packageName, bannerClass, bannerFunc, lpparam, new XC_MethodHook()
         {
-            Util.hookAllMethods(bannerClass, lpparam.classLoader, bannerFunc, new XC_MethodHook()
+            @Override
+            protected void beforeHookedMethod(MethodHookParam param)
             {
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param)
+                Util.log(packageName, "removeBanner: " + bannerClass + "#" + bannerFunc);
+
+                if (result == null)
                 {
-                    String debugMsg = String.format("removeBannerWithResult: Detect %s %s in %s", bannerClass, bannerFunc, packageName);
+                    Util.setDefaultResult(param);
+                }
+                else
+                {
+                    Util.setResultCompat(param, result);
+                }
 
-                    Util.log(packageName, debugMsg);
-
+                if (param.thisObject instanceof View)
+                {
                     ViewBlocking.removeAdView(packageName, (View) param.thisObject);
-
-                    param.setResult(result);
+                    Util.notifyAdNetwork(null, packageName, blockerName);
                 }
-            });
-        }
-        catch (ClassNotFoundError | NoSuchMethodError e)
-        {
-            if (e instanceof NoSuchMethodError)
-            {
-                Util.log(packageName, String.format("removeBannerWithResult: Method %s not found in %s.", bannerFunc, bannerClass));
+                else
+                {
+                    Util.notifyRemoveAdView(null, packageName, 1);
+                    Util.notifyAdNetwork(null, packageName, blockerName);
+                }
             }
-
-            return false;
-        }
-        return true;
+        });
     }
 
-    /*
-        Used for blocking ad functions
+    /** Memblokir method yang memuat iklan; seluruh overload ikut di-hook. */
+    public static boolean blockAdFunction(final String packageName, final String adClass,
+                                          final String adFunc, final XC_LoadPackage.LoadPackageParam lpparam)
+    {
+        return blockAdFunctionWithResult(packageName, adClass, adFunc, null, lpparam);
+    }
+
+    public static boolean blockAdFunctionExact(final String packageName, final String adClass, final String adFunc,
+                                               final Object parameter, final XC_LoadPackage.LoadPackageParam lpparam)
+    {
+        return hookExact(packageName, adClass, adFunc, null, lpparam, parameter);
+    }
+
+    public static boolean blockAdFunctionExact(final String packageName, final String adClass, final String adFunc,
+                                               final Object parameter1, final Object parameter2,
+                                               final XC_LoadPackage.LoadPackageParam lpparam)
+    {
+        return hookExact(packageName, adClass, adFunc, null, lpparam, parameter1, parameter2);
+    }
+
+    public static boolean blockAdFunctionExact(final String packageName, final String adClass, final String adFunc,
+                                               final Object parameter1, final Object parameter2, final Object parameter3,
+                                               final XC_LoadPackage.LoadPackageParam lpparam)
+    {
+        return hookExact(packageName, adClass, adFunc, null, lpparam, parameter1, parameter2, parameter3);
+    }
+
+    public static boolean blockAdFunctionWithResult(final String packageName, final String adClass, final String adFunc,
+                                                    final Object result, final XC_LoadPackage.LoadPackageParam lpparam)
+    {
+        final String blockerName = blockerNameOf(adClass);
+
+        return hookAll(packageName, adClass, adFunc, lpparam, new XC_MethodHook()
+        {
+            @Override
+            protected void beforeHookedMethod(MethodHookParam param)
+            {
+                Util.log(packageName, "blockAdFunction: " + adClass + "#" + adFunc);
+
+                if (result == null)
+                {
+                    Util.setDefaultResult(param);
+                }
+                else
+                {
+                    Util.setResultCompat(param, result);
+                }
+
+                Util.notifyRemoveAdView(null, packageName, 1);
+                Util.notifyAdNetwork(null, packageName, blockerName);
+            }
+        });
+    }
+
+    public static boolean blockAdFunctionWithResultExact(final String packageName, final String adClass, final String adFunc,
+                                                         final Object parameter, final Object result,
+                                                         final XC_LoadPackage.LoadPackageParam lpparam)
+    {
+        return hookExact(packageName, adClass, adFunc, result, lpparam, parameter);
+    }
+
+    public static boolean blockAdFunctionWithResultExact(final String packageName, final String adClass, final String adFunc,
+                                                         final Object parameter1, final Object parameter2, final Object result,
+                                                         final XC_LoadPackage.LoadPackageParam lpparam)
+    {
+        return hookExact(packageName, adClass, adFunc, result, lpparam, parameter1, parameter2);
+    }
+
+    private static boolean hookAll(String packageName, String className, String method,
+                                   XC_LoadPackage.LoadPackageParam lpparam, XC_MethodHook callback)
+    {
+        try
+        {
+            Class<?> clazz = Util.findClassOrNull(className, lpparam.classLoader);
+            if (clazz == null)
+            {
+                return false;
+            }
+            XposedBridge.hookAllMethods(clazz, method, callback);
+            return true;
+        }
+        catch (Throwable t)
+        {
+            Util.log(packageName, "hook " + className + "#" + method + " gagal: " + t);
+            return false;
+        }
+    }
+
+    private static boolean hookExact(String packageName, String className, String method, final Object result,
+                                     XC_LoadPackage.LoadPackageParam lpparam, Object... parameters)
+    {
+        final String blockerName = blockerNameOf(className);
+        final Object[] args = new Object[parameters.length + 1];
+        System.arraycopy(parameters, 0, args, 0, parameters.length);
+        args[parameters.length] = new XC_MethodHook()
+        {
+            @Override
+            protected void beforeHookedMethod(MethodHookParam param)
+            {
+                if (result == null)
+                {
+                    Util.setDefaultResult(param);
+                }
+                else
+                {
+                    Util.setResultCompat(param, result);
+                }
+
+                Util.notifyRemoveAdView(null, packageName, 1);
+                Util.notifyAdNetwork(null, packageName, blockerName);
+            }
+        };
+
+        try
+        {
+            // Cek kelas dulu: findAndHookMethod melempar NoSuchMethodError
+            // untuk setiap overload yang tidak ada, dan itu terjadi pada
+            // puluhan SDK yang tidak dipakai aplikasi.
+            if (Util.findClassOrNull(className, lpparam.classLoader) == null)
+            {
+                return false;
+            }
+            de.robv.android.xposed.XposedHelpers.findAndHookMethod(className, lpparam.classLoader, method, args);
+            return true;
+        }
+        catch (Throwable t)
+        {
+            Util.log(packageName, "hookExact " + className + "#" + method + " gagal: " + t);
+            return false;
+        }
+    }
+
+    /**
+     * Nama jaringan dari nama kelas SDK. Dipakai sebagai label statistik bila
+     * pemanggil tidak menyediakan nama eksplisit.
      */
-    public static boolean blockAdFunction(final String packageName, final String adClass, final String adFunc, final XC_LoadPackage.LoadPackageParam lpparam)
+    private static String blockerNameOf(String className)
     {
-        try
+        for (Blocker blocker : Main.blockers)
         {
-            Util.hookAllMethods(adClass, lpparam.classLoader, adFunc, new XC_MethodHook()
+            String banner = blocker.getBanner();
+            String prefix = blocker.getBannerPrefix();
+            String name = blocker.getName();
+
+            if (banner != null && className.equals(banner))
             {
-
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param)
-                {
-                    String debugMsg = String.format("blockAdFunction: Detect %s %s in %s", adClass, adFunc, packageName);
-
-                    Util.log(packageName, debugMsg);
-                    Util.notifyRemoveAdView(null, packageName, 1);
-
-                    param.setResult(new Object());
-                }
-            });
-        }
-        catch (ClassNotFoundError | NoSuchMethodError e)
-        {
-            if (e instanceof NoSuchMethodError)
-            {
-                Util.log(packageName, String.format("blockAdFunction: Method %s not found in %s.", adFunc, adFunc));
+                return name;
             }
-
-            return false;
-        }
-
-        return true;
-    }
-
-    public static boolean blockAdFunctionExact(final String packageName, final String adClass, final String adFunc, final Object parameter, final XC_LoadPackage.LoadPackageParam lpparam)
-    {
-        try
-        {
-            XposedHelpers.findAndHookMethod(adClass, lpparam.classLoader, adFunc, parameter, new XC_MethodHook()
+            if (prefix != null && className.startsWith(prefix))
             {
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param)
-                {
-                    String debugMsg = String.format("Detect %s %s(%s) in %s", adClass, adFunc, parameter.toString(), packageName);
-
-                    Util.log(packageName, debugMsg);
-
-                    Util.notifyRemoveAdView(null, packageName, 1);
-
-                    param.setResult(new Object());
-                }
-            });
-        }
-        catch (ClassNotFoundError | NoSuchMethodError e)
-        {
-            if (e instanceof NoSuchMethodError)
-            {
-                Util.log(packageName, String.format("blockAdFunction: Method %s(%s) not found in %s.", adFunc, parameter.toString(), adClass));
+                return name;
             }
-
-            return false;
         }
-
-        return true;
-    }
-
-    public static boolean blockAdFunctionExact(final String packageName, final String adClass, final String adFunc, final Object parameter1, final Object parameter2, final XC_LoadPackage.LoadPackageParam lpparam)
-    {
-        try
-        {
-            XposedHelpers.findAndHookMethod(adClass, lpparam.classLoader, adFunc, parameter1, parameter2, new XC_MethodHook()
-            {
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param)
-                {
-                    String debugMsg = String.format("Detect %s %s(%s, %s) in %s", adClass, adFunc, parameter1.toString(), parameter2.toString(), packageName);
-
-                    Util.log(packageName, debugMsg);
-
-                    Util.notifyRemoveAdView(null, packageName, 1);
-
-                    param.setResult(new Object());
-                }
-            });
-        }
-        catch (ClassNotFoundError | NoSuchMethodError e)
-        {
-            if (e instanceof NoSuchMethodError)
-            {
-                Util.log(packageName, String.format("blockAdFunction: Method %s(%s, %s) not found in %s.", adFunc, parameter1.toString(), parameter2.toString(), adClass));
-            }
-
-            return false;
-        }
-
-        return true;
-    }
-
-    public static boolean blockAdFunctionExact(final String packageName, final String adClass, final String adFunc, final Object parameter1, final Object parameter2, final Object parameter3, final XC_LoadPackage.LoadPackageParam lpparam)
-    {
-        try
-        {
-            XposedHelpers.findAndHookMethod(adClass, lpparam.classLoader, adFunc, parameter1, parameter2, parameter3, new XC_MethodHook()
-            {
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param)
-                {
-                    String debugMsg = String.format("Detect %s %s(%s, %s, %s) in %s", adClass, adFunc, parameter1.toString(), parameter2.toString(), parameter3.toString(), packageName);
-
-                    Util.log(packageName, debugMsg);
-
-                    Util.notifyRemoveAdView(null, packageName, 1);
-
-                    param.setResult(new Object());
-                }
-            });
-        }
-        catch (ClassNotFoundError | NoSuchMethodError e)
-        {
-            if (e instanceof NoSuchMethodError)
-            {
-                Util.log(packageName, String.format("blockAdFunction: Method %s(%s, %s, %s) not found in %s.", adFunc, parameter1.toString(), parameter2.toString(), parameter3.toString(), adClass));
-            }
-
-            return false;
-        }
-
-        return true;
-    }
-
-    public static boolean blockAdFunctionWithResult(final String packageName, final String adClass, final String adFunc, final Object result, final XC_LoadPackage.LoadPackageParam lpparam)
-    {
-        try
-        {
-            XposedHelpers.findAndHookMethod(adClass, lpparam.classLoader, adFunc, new XC_MethodHook()
-            {
-
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param)
-                {
-                    String debugMsg = String.format("blockAdFunctionWithResult: Detect %s %s in %s", adClass, adFunc, packageName);
-
-                    Util.log(packageName, debugMsg);
-
-                    Util.notifyRemoveAdView(null, packageName, 1);
-
-                    param.setResult(result);
-                }
-            });
-        }
-        catch (ClassNotFoundError | NoSuchMethodError e)
-        {
-            if (e instanceof NoSuchMethodError)
-            {
-                Util.log(packageName, String.format("blockAdFunctionWithResult: Method %s not found in %s.", adFunc, adClass));
-            }
-
-            return false;
-        }
-
-        return true;
-    }
-
-
-    public static boolean blockAdFunctionWithResultExact(final String packageName, final String adClass, final String adFunc, final Object parameter, final Object result, final XC_LoadPackage.LoadPackageParam lpparam)
-    {
-        try
-        {
-            XposedHelpers.findAndHookMethod(adClass, lpparam.classLoader, adFunc, parameter, new XC_MethodHook()
-            {
-
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param)
-                {
-                    String debugMsg = String.format("Detect %s %s(%s) in %s", adClass, adFunc, parameter.toString(), packageName);
-
-                    Util.log(packageName, debugMsg);
-
-                    Util.notifyRemoveAdView(null, packageName, 1);
-
-                    param.setResult(result);
-                }
-            });
-        }
-        catch (ClassNotFoundError | NoSuchMethodError e)
-        {
-            if (e instanceof NoSuchMethodError)
-            {
-                Util.log(packageName, String.format("blockAdFunctionWithResult: Method %s(%s) not found in %s.", adFunc, parameter.toString(), adClass));
-            }
-
-            return false;
-        }
-
-        return true;
-    }
-
-
-    public static boolean blockAdFunctionWithResultExact(final String packageName, final String adClass, final String adFunc, final Object parameter1, final Object parameter2, final Object result, final XC_LoadPackage.LoadPackageParam lpparam)
-    {
-        try
-        {
-            XposedHelpers.findAndHookMethod(adClass, lpparam.classLoader, adFunc, parameter1, parameter2, new XC_MethodHook()
-            {
-
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param)
-                {
-                    String debugMsg = String.format("Detect %s %s(%s, %s) in %s", adClass, adFunc, parameter1.toString(), parameter2.toString(), packageName);
-
-                    Util.log(packageName, debugMsg);
-
-                    Util.notifyRemoveAdView(null, packageName, 1);
-
-                    param.setResult(result);
-                }
-            });
-        }
-        catch (ClassNotFoundError | NoSuchMethodError e)
-        {
-            if (e instanceof NoSuchMethodError)
-            {
-                Util.log(packageName, String.format("blockAdFunctionWithResultExact: Method %s(%s, %s) not found in %s.", adFunc, parameter1.toString(), parameter2.toString(), adClass));
-            }
-
-            return false;
-        }
-
-        return true;
+        // Kelas khusus per aplikasi tidak terdaftar di array blockers.
+        return "Custom";
     }
 }

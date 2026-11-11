@@ -14,7 +14,7 @@ public class Adfurikun extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "a", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "a", lpparam);
 
         return result;
     }

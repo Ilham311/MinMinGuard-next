@@ -36,6 +36,7 @@ public class MainFragment extends Fragment
     private Button mBtnBatchSelectAll;
     private View mBatchBar;
     private TextView mTxtBatchCount;
+    private TextView mTxtEmpty;
     private AppsAdapter adapter;
     private SharedPreferences mModPref;
     private final View.OnClickListener btnModeClick = new View.OnClickListener()
@@ -43,7 +44,7 @@ public class MainFragment extends Fragment
         @Override
         public void onClick(View v)
         {
-            mModPref.edit().putString(Common.KEY_MODE, Common.getModeString(mMode)).apply();
+            mModPref.edit().putString(Common.KEY_MODE, modeValue()).apply();
             adapter.notifyDataSetChanged();
 
             String[] modes = getResources().getStringArray(R.array.mode_array);
@@ -59,6 +60,21 @@ public class MainFragment extends Fragment
         args.putInt(Common.KEY_MODE, mode.ordinal());
         fragment.setArguments(args);
         return fragment;
+    }
+
+    /** Nilai preferensi untuk mode ini (dipakai saat tombol "Terapkan" ditekan). */
+    public String modeValue()
+    {
+        switch (mMode)
+        {
+            case AUTO:
+                return Common.VALUE_MODE_AUTO;
+            case WHITELIST:
+                return Common.VALUE_MODE_WHITELIST;
+            case BLACKLIST:
+            default:
+                return Common.VALUE_MODE_BLACKLIST;
+        }
     }
 
     @Override
@@ -111,6 +127,7 @@ public class MainFragment extends Fragment
         }
 
         RecyclerView mRecyclerView = view.findViewById(R.id.recycler_view);
+        mTxtEmpty = view.findViewById(R.id.txt_empty);
 
         if (!Util.xposedEnabled())
         {
@@ -222,8 +239,14 @@ public class MainFragment extends Fragment
         }
         editor.apply();
 
+        final int count = selected.size();
         exitSelectionMode();
         mainActivity.refresh(false);
+        View root = getView();
+        if (root != null)
+        {
+            Snackbar.make(root, getString(R.string.msg_batch_done, count), Snackbar.LENGTH_SHORT).show();
+        }
     }
 
     private void exitSelectionMode()
@@ -261,14 +284,13 @@ public class MainFragment extends Fragment
         mBtnBatchSelectAll.setText(allSelected ? R.string.batch_deselect_all : R.string.batch_select_all);
     }
 
-    public void onAdapterSelectionRequested()
+    /** Menyegarkan hitungan iklan tanpa memuat ulang daftar aplikasi. */
+    public void updateStats()
     {
-        enterSelectionMode();
-    }
-
-    public FragmentMode getMode()
-    {
-        return mMode;
+        if (adapter != null)
+        {
+            adapter.reloadStats();
+        }
     }
 
     public void updateAndNotify(ArrayList<AppDetails> list)
@@ -278,6 +300,17 @@ public class MainFragment extends Fragment
             adapter.setAppList(list);
             adapter.notifyDataSetChanged();
         }
+        updateEmptyState(list);
+    }
+
+    private void updateEmptyState(List<AppDetails> list)
+    {
+        if (mTxtEmpty == null)
+        {
+            return;
+        }
+        boolean empty = list == null || list.isEmpty();
+        mTxtEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
     }
 
     @Override

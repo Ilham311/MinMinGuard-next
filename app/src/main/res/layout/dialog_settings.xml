@@ -25,18 +25,25 @@
                 android:text="@string/msg_show_system_apps"/>
 
         <com.google.android.material.checkbox.MaterialCheckBox
-                android:id="@+id/cb_show_debug_info"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:checked="false"
-                android:text="@string/msg_show_debug"/>
-
-        <com.google.android.material.checkbox.MaterialCheckBox
                 android:id="@+id/cb_enable_cr"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:checked="false"
                 android:text="@string/msg_enabled_crash_report"/>
+
+        <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/cb_heuristic"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="@string/setting_heuristic"/>
+
+        <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/cb_verbose"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="false"
+                android:text="@string/setting_verbose"/>
 
         <View
                 android:layout_width="match_parent"

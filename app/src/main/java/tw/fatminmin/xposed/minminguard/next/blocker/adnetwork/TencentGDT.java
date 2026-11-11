@@ -1,15 +1,21 @@
 package tw.fatminmin.xposed.minminguard.next.blocker.adnetwork;
 
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
+import tw.fatminmin.xposed.minminguard.next.blocker.ApiBlocking;
 import tw.fatminmin.xposed.minminguard.next.blocker.Blocker;
 
 /**
- * Tencent GDT (Guangdian Tong) - blocked by class name prefixes.
+ * Tencent GDT / Guangdiantong ({@code com.qq.e}).
  */
 public class TencentGDT extends Blocker
 {
     public static final String BANNER = "com.qq.e.ads.banner2.UnifiedBannerView";
     public static final String BANNER_PREFIX = "com.qq.e";
+
+    private static final String NATIVE_AD_MANAGER = "com.qq.e.ads.nativ.NativeADUnifiedManager";
+    private static final String INTERSTITIAL_AD = "com.qq.e.ads.interstitial2.UnifiedInterstitialAD";
+    private static final String REWARD_VIDEO_AD = "com.qq.e.ads.rewardvideo.RewardVideoAD";
+    private static final String SPLASH_AD = "com.qq.e.ads.splash.SplashAD";
 
     @Override
     public String getBanner()
@@ -26,6 +32,18 @@ public class TencentGDT extends Blocker
     @Override
     public boolean handleLoadPackage(String packageName, XC_LoadPackage.LoadPackageParam lpparam)
     {
-        return false;
+        boolean result = false;
+
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "loadAd", lpparam);
+
+        result |= ApiBlocking.blockAdFunction(packageName, NATIVE_AD_MANAGER, "loadData", lpparam);
+        result |= ApiBlocking.blockAdFunction(packageName, INTERSTITIAL_AD, "loadAd", lpparam);
+        result |= ApiBlocking.blockAdFunction(packageName, INTERSTITIAL_AD, "show", lpparam);
+        result |= ApiBlocking.blockAdFunction(packageName, INTERSTITIAL_AD, "showFullScreenAD", lpparam);
+        result |= ApiBlocking.blockAdFunction(packageName, REWARD_VIDEO_AD, "loadAD", lpparam);
+        result |= ApiBlocking.blockAdFunction(packageName, REWARD_VIDEO_AD, "showAD", lpparam);
+        result |= ApiBlocking.blockAdFunction(packageName, SPLASH_AD, "fetchAdOnly", lpparam);
+
+        return result;
     }
 }

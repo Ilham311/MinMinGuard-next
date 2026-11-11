@@ -16,7 +16,7 @@ public class Millennial extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "getAd", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "getAd", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "display", lpparam);
 
         return result;

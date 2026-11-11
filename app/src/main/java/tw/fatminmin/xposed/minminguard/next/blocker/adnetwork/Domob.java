@@ -16,7 +16,7 @@ public class Domob extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "setAdEventListener", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "setAdEventListener", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "setInterstitialAdListener", lpparam);
 
         return result;

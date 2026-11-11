@@ -14,7 +14,7 @@ public class MasAd extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "b", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "b", lpparam);
 
         return result;
     }

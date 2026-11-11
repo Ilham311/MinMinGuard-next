@@ -32,7 +32,7 @@ The project has been modernised (AGP 8.13 / Gradle 8.13, compileSdk 36, Java 17)
 
 Notes:
 
-- The module `applicationId` is `tw.fatminmin.xposed.minminguard.next` (version 3.0.0, versionCode 72). Xposed/LSPosed scope strings and the `assets/xposed_init` entry refer to this package.
+- The module `applicationId` is `tw.fatminmin.xposed.minminguard.next` (version 3.1.0, versionCode 73). Xposed/LSPosed scope strings and the `assets/xposed_init` entry refer to this package.
 - `de.robv.android.xposed:api:82` is resolved from `https://api.xposed.info/` (jcenter is gone).
 - If you point the build at a local SDK, put `sdk.dir=` in `local.properties` (git-ignored).
 
@@ -64,6 +64,72 @@ The release job decodes the keystore into `$RUNNER_TEMP`, verifies the
 resulting APK with `apksigner`, and deletes the keystore afterwards. Pull
 requests build the debug APK only, because secrets are not exposed to them.
 
+
+## What changed in 3.1.0
+
+This release is an internal rebuild rather than a feature skin. The blocking
+pipeline is the same three layers (SDK API hooks, class-name matching, WebView
+URL filtering) plus an optional DNS layer, but almost everything around them
+was replaced.
+
+**Data layer**
+
+- greenDAO 2.0.0 is gone. `DaoMaster.DevOpenHelper` dropped every table on a
+  schema upgrade, which silently deleted all user statistics on each module
+  update. It is replaced by `data/StatsDatabase`, a hand-written
+  `SQLiteOpenHelper` that performs real `ALTER TABLE` migrations.
+- The provider (`MinMinProvider`) is now the single writer. Updates are deltas
+  applied with `INSERT OR IGNORE` + `UPDATE ... = col + ?` inside a transaction,
+  so two blocked apps reporting at the same time can no longer overwrite each
+  other. The `ON CONFLICT DO UPDATE` syntax is deliberately avoided because it
+  requires SQLite 3.24 (Android 11) and the module supports API 21.
+- The UI no longer opens its own `SQLiteDatabase`; it reads through
+  `ContentResolver` (`data/StatsRepository`), and WAL is enabled so readers do
+  not block writers.
+- Schema 2 adds `LAST_SEEN` and a `NETWORK_STAT` table (per-app, per-network
+  hit counts). The old space-separated network list is migrated automatically.
+
+**Blocking**
+
+- New SDK blockers: Smaato, Fyber, TopOn. Pangle, Mintegral, Tapjoy and
+  Tencent GDT were corrected (wrong method names and a wrong constant meant
+  they never matched).
+- `Blocklist` replaces the old "26,761 patterns × `String.contains` per URL"
+  scan with a split host set, path-prefix set and resource patterns. Host
+  matching walks suffixes (`a.b.example.com` → `b.example.com` → `example.com`),
+  so it costs a few lookups instead of 26 thousand comparisons per navigation.
+- `BlockPrefs` centralises XSharedPreferences access and handles both the
+  legacy file path (bridge < 93) and the LSPosed >= 93 constructor. Reads are
+  throttled and no longer take a shared monitor on every inflated view.
+- `StatsReporter` batches statistics into one queue with a single flush instead
+  of spawning a thread per detected network, and flushes atomically.
+- DNS blocking (`HostBlock`) now aborts the lookup *before* it reaches the
+  network instead of discarding the result afterwards.
+- `ViewBlocking` processes each view once (previously `addView` counted the
+  same ad twice), and `NameBlocking` stops descending into a subtree once an
+  ad root is removed and limits traversal depth.
+- WebView sub-resources that are blocked now also count towards statistics,
+  and are reported under the `WebView` network label.
+- `PeriodCalendar`'s resource hook was dead code: `Main` did not implement
+  `IXposedHookInitPackageResources`, so the method was never called.
+
+**UI**
+
+- Predictive back support. `onBackPressed()` is no longer called on Android 16
+  (targetSdk 36); the activity uses `OnBackPressedCallback` and closes the
+  drawer first.
+- The app list is no longer hidden behind the *Apply* button, and an empty
+  state is shown when a filter matches nothing.
+- Search now applies to every tab and no longer shows the full list when the
+  query matches nothing.
+- App detail shows the last time an ad was blocked, per-app URL/DNS/whitelist
+  switches, and a button to clear that app's statistics.
+- Settings gained heuristic-detection and verbose-log switches (written to the
+  module preferences that the hooked process actually reads) and the statistics
+  dialog gained a "reset statistics" action.
+- `PrefFileManager` is a real singleton; it used to create a new
+  `FileObserver` on every activity recreation and never release it.
+- Full Indonesian translation (`values-in`).
 
 ### Adding a new ad network into support
 

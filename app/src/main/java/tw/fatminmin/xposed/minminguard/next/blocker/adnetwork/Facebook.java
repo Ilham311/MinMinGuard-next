@@ -18,7 +18,7 @@ public class Facebook extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "loadAd", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "loadAd", lpparam);
         result |= ApiBlocking.removeBanner(packageName, BANNER, "setAdListener", lpparam);
 
         result |= ApiBlocking.blockAdFunction(packageName, INTER, "loadAd", lpparam);

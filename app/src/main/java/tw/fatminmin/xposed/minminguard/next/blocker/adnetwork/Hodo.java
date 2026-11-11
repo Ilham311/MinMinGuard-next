@@ -13,7 +13,7 @@ public class Hodo extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "requestAD", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "requestAD", lpparam);
         result |= ApiBlocking.removeBanner(packageName, BANNER, "setListener", lpparam);
 
         return result;

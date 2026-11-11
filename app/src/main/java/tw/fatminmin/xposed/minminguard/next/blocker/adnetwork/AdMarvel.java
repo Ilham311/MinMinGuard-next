@@ -16,7 +16,7 @@ public class AdMarvel extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "requestNewAd", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "requestNewAd", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "requestNewInterstitialAd", lpparam);
 
         return result;

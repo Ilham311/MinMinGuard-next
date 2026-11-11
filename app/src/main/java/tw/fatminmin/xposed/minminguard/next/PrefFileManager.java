@@ -2,98 +2,212 @@ package tw.fatminmin.xposed.minminguard.next;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.FileObserver;
 
-import java.io.File;
-
 import androidx.core.content.ContextCompat;
 
+import java.io.File;
+
 /**
- * Created by Xspeed on 2019/7/7.
+ * Membuat berkas preferensi modul tetap bisa dibaca oleh proses aplikasi lain.
+ * <p>
+ * Versi sebelumnya bernama {@code getInstance} tetapi selalu membuat objek
+ * baru, sehingga setiap {@code Activity} yang dibuat ulang (rotasi, ganti
+ * tema) meninggalkan satu {@link FileObserver} yang masih menonton folder dan
+ * tidak pernah dilepas. Sekarang benar-benar singleton dan memakai
+ * {@code Application} context, jadi observer hanya ada satu seumur proses.
  */
-public class PrefFileManager
+public final class PrefFileManager
 {
+    private static volatile PrefFileManager sInstance;
+
     private final Context mContext;
-    private final FileObserver mFileObserver;
+    private final Object mLock = new Object();
+    private FileObserver mFileObserver;
     private boolean mSelfAttrChange;
+    private int mResumeCount;
 
     private PrefFileManager(Context context)
     {
         mContext = Build.VERSION.SDK_INT >= 24 && !ContextCompat.isDeviceProtectedStorage(context)
                 ? ContextCompat.createDeviceProtectedStorageContext(context) : context;
-
-        mFileObserver = new FileObserver(mContext.getFilesDir().getParentFile() + "/shared_prefs", FileObserver.ATTRIB)
-        {
-            @Override
-            public void onEvent(int event, String path)
-            {
-                if ((event & FileObserver.ATTRIB) != 0)
-                    onFileAttributesChanged(path);
-            }
-        };
-        mFileObserver.startWatching();
     }
 
-    public static synchronized PrefFileManager getInstance(Context context)
+    public static PrefFileManager getInstance(Context context)
     {
-        if (context == null) throw new IllegalArgumentException("Context cannot be null");
-        if (context.getApplicationContext() != null) context = context.getApplicationContext();
-        return new PrefFileManager(context);
+        if (context == null)
+        {
+            throw new IllegalArgumentException("Context cannot be null");
+        }
+        PrefFileManager instance = sInstance;
+        if (instance == null)
+        {
+            synchronized (PrefFileManager.class)
+            {
+                instance = sInstance;
+                if (instance == null)
+                {
+                    Context app = context.getApplicationContext();
+                    instance = new PrefFileManager(app != null ? app : context);
+                    sInstance = instance;
+                }
+            }
+        }
+        return instance;
     }
 
     public void fixFolderPermissionsAsync()
     {
-        AsyncTask.execute(new Runnable() {
+        new Thread(new Runnable()
+        {
             @SuppressLint("SetWorldReadable")
             @SuppressWarnings("ResultOfMethodCallIgnored")
             @Override
-            public void run() {
+            public void run()
+            {
                 File pkgFolder = mContext.getFilesDir().getParentFile();
-                if (pkgFolder.exists())
+                if (pkgFolder != null && pkgFolder.exists())
                 {
                     pkgFolder.setExecutable(true, false);
                     pkgFolder.setReadable(true, false);
                 }
                 File cacheFolder = mContext.getCacheDir();
-                if (cacheFolder.exists())
+                if (cacheFolder != null && cacheFolder.exists())
                 {
                     cacheFolder.setExecutable(true, false);
                     cacheFolder.setReadable(true, false);
                 }
                 File filesFolder = mContext.getFilesDir();
-                if (filesFolder.exists())
+                if (filesFolder != null && filesFolder.exists())
                 {
                     filesFolder.setExecutable(true, false);
                     filesFolder.setReadable(true, false);
-                    for (File f : filesFolder.listFiles())
+                    File[] children = filesFolder.listFiles();
+                    if (children != null)
                     {
-                        f.setExecutable(true, false);
-                        f.setReadable(true, false);
+                        for (File f : children)
+                        {
+                            f.setExecutable(true, false);
+                            f.setReadable(true, false);
+                        }
                     }
                 }
             }
-        });
+        }, "mmg-perms").start();
     }
 
-    public void onPause()
-    {
-        mFileObserver.stopWatching();
-        fixPermissions(true);
-    }
-
+    /** Dipanggil dari {@code Activity#onStart}; aman untuk beberapa Activity. */
     public void onResume()
     {
-        fixPermissions(true);
-        mFileObserver.startWatching();
+        synchronized (mLock)
+        {
+            mResumeCount++;
+            if (mResumeCount > 1)
+            {
+                return;
+            }
+            fixPermissions(true);
+            startWatching();
+        }
+    }
+
+    /** Dipanggil dari {@code Activity#onStop}; observer dilepas setelah pemakai terakhir. */
+    public void onPause()
+    {
+        synchronized (mLock)
+        {
+            if (mResumeCount > 0)
+            {
+                mResumeCount--;
+            }
+            if (mResumeCount > 0)
+            {
+                return;
+            }
+            stopWatching();
+            fixPermissions(true);
+        }
+    }
+
+    private void startWatching()
+    {
+        if (mFileObserver != null)
+        {
+            return;
+        }
+
+        File sharedPrefs = new File(mContext.getFilesDir().getParentFile(), "shared_prefs");
+        if (!sharedPrefs.exists())
+        {
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= 29)
+        {
+            mFileObserver = new FileObserver(sharedPrefs, FileObserver.ATTRIB)
+            {
+                @Override
+                public void onEvent(int event, String path)
+                {
+                    if ((event & FileObserver.ATTRIB) != 0)
+                    {
+                        onFileAttributesChanged(path);
+                    }
+                }
+            };
+        }
+        else
+        {
+            mFileObserver = new FileObserver(sharedPrefs.getAbsolutePath(), FileObserver.ATTRIB)
+            {
+                @Override
+                public void onEvent(int event, String path)
+                {
+                    if ((event & FileObserver.ATTRIB) != 0)
+                    {
+                        onFileAttributesChanged(path);
+                    }
+                }
+            };
+        }
+
+        try
+        {
+            mFileObserver.startWatching();
+        }
+        catch (Throwable ignored)
+        {
+            mFileObserver = null;
+        }
+    }
+
+    private void stopWatching()
+    {
+        if (mFileObserver == null)
+        {
+            return;
+        }
+        try
+        {
+            mFileObserver.stopWatching();
+        }
+        catch (Throwable ignored)
+        {
+        }
+        mFileObserver = null;
     }
 
     @SuppressLint("SetWorldReadable")
     @SuppressWarnings("ResultOfMethodCallIgnored")
     private void fixPermissions(boolean force)
     {
-        File sharedPrefsFolder = new File(mContext.getFilesDir().getParentFile(), "shared_prefs");
+        File parent = mContext.getFilesDir().getParentFile();
+        if (parent == null)
+        {
+            return;
+        }
+        File sharedPrefsFolder = new File(parent, "shared_prefs");
         if (sharedPrefsFolder.exists())
         {
             sharedPrefsFolder.setExecutable(true, false);

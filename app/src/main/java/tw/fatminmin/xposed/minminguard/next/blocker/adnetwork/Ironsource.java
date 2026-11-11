@@ -13,7 +13,7 @@ public class Ironsource extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.blockAdFunction(packageName, SuperSonicAdsAdapter, "showRewardedVideo", lpparam);
+        result |= ApiBlocking.blockAdFunction(packageName, SuperSonicAdsAdapter, "showRewardedVideo", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, SuperSonicAdsAdapter, "showInterstitial", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, SuperSonicAdsAdapter, "showOfferwall", lpparam);
 

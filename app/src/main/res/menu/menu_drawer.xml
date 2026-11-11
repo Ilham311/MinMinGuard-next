@@ -10,6 +10,10 @@
             android:icon="@drawable/about"
             android:title="@string/action_statistics"/>
     <item
+            android:id="@+id/action_reset_stats"
+            android:icon="@drawable/ic_settings_black_24dp"
+            android:title="@string/setting_reset_stats"/>
+    <item
             android:id="@+id/action_tutorial"
             android:icon="@drawable/tutorial"
             android:title="@string/action_tutorial"/>

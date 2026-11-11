@@ -18,7 +18,7 @@ public class Aotter extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.blockAdFunction(packageName, NATIVE_ADS, "setAdListener", lpparam);
+        result |= ApiBlocking.blockAdFunction(packageName, NATIVE_ADS, "setAdListener", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, NATIVE_ADS, "registerViewForInteraction", lpparam);
 
         return result;

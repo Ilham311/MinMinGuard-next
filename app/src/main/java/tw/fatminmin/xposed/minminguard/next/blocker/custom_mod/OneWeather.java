@@ -3,8 +3,6 @@ package tw.fatminmin.xposed.minminguard.next.blocker.custom_mod;
 import android.view.View;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
-import de.robv.android.xposed.XposedHelpers;
-import de.robv.android.xposed.XposedHelpers.ClassNotFoundError;
 import de.robv.android.xposed.callbacks.XC_InitPackageResources.InitPackageResourcesParam;
 import de.robv.android.xposed.callbacks.XC_LayoutInflated;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
@@ -21,24 +19,20 @@ public final class OneWeather
 
     public static boolean handleLoadPackage(final String packageName, LoadPackageParam lpparam)
     {
-        try
-        {
-            Class<?> adView = XposedHelpers.findClass("com.handmark.expressweather.billing.BillingUtils", lpparam.classLoader);
-            XposedBridge.hookAllMethods(adView, "isPurchased", new XC_MethodHook()
-            {
-
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param)
-                {
-
-                    param.setResult(Boolean.valueOf(true));
-                }
-            });
-        }
-        catch (ClassNotFoundError e)
+        Class<?> billing = tw.fatminmin.xposed.minminguard.next.blocker.Util
+                .findClassOrNull("com.handmark.expressweather.billing.BillingUtils", lpparam.classLoader);
+        if (billing == null)
         {
             return false;
         }
+        XposedBridge.hookAllMethods(billing, "isPurchased", new XC_MethodHook()
+        {
+            @Override
+            protected void beforeHookedMethod(MethodHookParam param)
+            {
+                tw.fatminmin.xposed.minminguard.next.blocker.Util.setResultCompat(param, Boolean.TRUE);
+            }
+        });
         return true;
     }
 
@@ -57,12 +51,16 @@ public final class OneWeather
             {
 
                 View ad = liparam.view.findViewById(liparam.res.getIdentifier("adview", "id", LAYOUT));
-
-                ad.setVisibility(View.GONE);
+                if (ad != null)
+                {
+                    ad.setVisibility(View.GONE);
+                }
 
                 ad = liparam.view.findViewById(liparam.res.getIdentifier("share_ad_cover", "id", LAYOUT));
-
-                ad.setVisibility(View.GONE);
+                if (ad != null)
+                {
+                    ad.setVisibility(View.GONE);
+                }
             }
         });
     }

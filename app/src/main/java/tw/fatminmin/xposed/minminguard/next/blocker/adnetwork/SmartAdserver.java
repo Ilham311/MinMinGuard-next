@@ -15,7 +15,7 @@ public class SmartAdserver extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "loadAd", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "loadAd", lpparam);
 
         return result;
     }

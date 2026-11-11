@@ -8,7 +8,7 @@ import tw.fatminmin.xposed.minminguard.next.blocker.ViewBlocking;
 /**
  * Created by fatminmin on 2015/10/30.
  */
-final class PeriodCalendar
+public final class PeriodCalendar
 {
 
     private static String pkgName = "com.popularapp.periodcalendar";
@@ -34,8 +34,10 @@ final class PeriodCalendar
             {
 
                 View ad = liparam.view.findViewById(liparam.res.getIdentifier("native_layout", "id", pkgName));
-
-                ViewBlocking.removeAdView(pkgName, ad);
+                if (ad != null)
+                {
+                    ViewBlocking.removeAdView(pkgName, ad);
+                }
             }
         });
     }

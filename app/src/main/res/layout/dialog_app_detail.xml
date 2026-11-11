@@ -108,15 +108,77 @@
                     android:textSize="15sp"/>
         </LinearLayout>
 
+        <TextView
+                android:id="@+id/txt_toggles_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/detail_toggles_hint"
+                android:textColor="?colorOnSurfaceVariant"
+                android:textSize="12sp"/>
+
         <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/switch_url_filter"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="8dp"
                 android:text="@string/option_enable_url_filter"
                 android:textColor="?colorOnSurface"
                 android:textSize="15sp"
                 android:textStyle="bold"/>
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switch_dns_filter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/option_enable_dns_filter"
+                android:textColor="?colorOnSurface"
+                android:textSize="15sp"
+                android:textStyle="bold"/>
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switch_whitelist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/option_enable_whitelist"
+                android:textColor="?colorOnSurface"
+                android:textSize="15sp"
+                android:textStyle="bold"/>
+
+        <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+            <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/detail_last_seen"
+                    android:textColor="?colorOnSurface"
+                    android:textSize="15sp"
+                    android:textStyle="bold"/>
+
+            <TextView
+                    android:id="@+id/txt_last_seen"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:textColor="?colorOnSurfaceVariant"
+                    android:textSize="15sp"
+                    tools:text="2 jam lalu"/>
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_clear_app_stats"
+                style="?materialButtonOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/detail_clear_stats"/>
 
     </LinearLayout>
 </ScrollView>

@@ -13,7 +13,7 @@ public class Mobclix extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "getAd", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "getAd", lpparam);
 
         return result;
     }

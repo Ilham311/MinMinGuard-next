@@ -15,7 +15,7 @@ public class GoogleGmsDoubleClick extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, PUBLISHER_BANNER, "loadAd", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, PUBLISHER_BANNER, "loadAd", lpparam);
 
         result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "loadAd", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "show", lpparam);

@@ -21,7 +21,7 @@ public class Applovin extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.blockAdFunction(packageName, MAX_ADVIEW, "loadAd", lpparam);
+        result |= ApiBlocking.blockAdFunction(packageName, MAX_ADVIEW, "loadAd", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, MAX_INTER, "loadAd", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, MAX_REWARDED, "loadAd", lpparam);
         result |= ApiBlocking.blockAdFunctionWithResult(packageName, SDK_ENABLED, "isEnabled", false, lpparam);

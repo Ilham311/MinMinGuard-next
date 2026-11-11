@@ -20,7 +20,7 @@ public class Adbert extends Blocker
     public boolean handleLoadPackage(final String packageName, final XC_LoadPackage.LoadPackageParam lpparam)
     {
         boolean result = false;
-        result = ApiBlocking.removeBanner(packageName, BANNER, "start", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "start", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "loadAd", lpparam);
 
         return result;

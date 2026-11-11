@@ -17,7 +17,7 @@ public class Vungle extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.blockAdFunctionWithResult(packageName, VUNGLE_WARREN_STORAGE, "findValidAdvertisementForPlacement", null, lpparam);
+        result |= ApiBlocking.blockAdFunctionWithResult(packageName, VUNGLE_WARREN_STORAGE, "findValidAdvertisementForPlacement", null, lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, VUNGLE_WARREN, "loadAd", lpparam);
 
         result |= ApiBlocking.blockAdFunction(packageName, VUNGLE_PUBLISHER, "loadAd", lpparam);

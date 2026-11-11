@@ -47,9 +47,10 @@ public class SettingsDialogFragment extends DialogFragment
     private SharedPreferences mUiPref;
     private SharedPreferences mModPref;
     private MaterialCheckBox mCbShowSystemApps;
-    private MaterialCheckBox mCbShowDebugInfo;
     private MaterialCheckBox mCbShowLauncherIcon;
     private MaterialCheckBox mCbEnableCr;
+    private MaterialCheckBox mCbHeuristic;
+    private MaterialCheckBox mCbVerbose;
 
     private final ActivityResultLauncher<String> mExportLauncher = registerForActivityResult(
             new ActivityResultContracts.CreateDocument("application/json"),
@@ -105,14 +106,17 @@ public class SettingsDialogFragment extends DialogFragment
         mCbShowSystemApps = v.findViewById(R.id.cb_show_system_apps);
         mCbShowSystemApps.setChecked(mUiPref.getBoolean(Common.KEY_SHOW_SYSTEM_APPS, false));
 
-        mCbShowDebugInfo = v.findViewById(R.id.cb_show_debug_info);
-        mCbShowDebugInfo.setChecked(Util.DEBUG);
-
         mCbShowLauncherIcon = v.findViewById(R.id.cb_show_launcher_icon);
         mCbShowLauncherIcon.setChecked(mUiPref.getBoolean(Common.KEY_SHOW_LAUNCHER_ICON, true));
 
         mCbEnableCr = v.findViewById(R.id.cb_enable_cr);
         mCbEnableCr.setChecked(mUiPref.getBoolean(Common.KEY_ENABLE_CRASH_REPORT, false));
+
+        mCbHeuristic = v.findViewById(R.id.cb_heuristic);
+        mCbHeuristic.setChecked(mModPref.getBoolean(Common.KEY_HEURISTIC, true));
+
+        mCbVerbose = v.findViewById(R.id.cb_verbose);
+        mCbVerbose.setChecked(mModPref.getBoolean(Common.KEY_VERBOSE_LOG, Util.DEBUG));
 
         v.findViewById(R.id.btn_theme).setOnClickListener(new View.OnClickListener()
         {
@@ -160,16 +164,26 @@ public class SettingsDialogFragment extends DialogFragment
             @Override
             public void onClick(View view)
             {
-                Util.DEBUG = mCbShowDebugInfo.isChecked();
+                Util.DEBUG = mCbVerbose.isChecked();
 
                 mUiPref.edit()
                         .putBoolean(Common.KEY_SHOW_SYSTEM_APPS, mCbShowSystemApps.isChecked())
                         .putBoolean(Common.KEY_ENABLE_CRASH_REPORT, mCbEnableCr.isChecked())
                         .apply();
 
+                // Opsi ini dibaca proses aplikasi yang di-hook lewat
+                // XSharedPreferences, jadi harus ditulis ke preferensi mod.
+                mModPref.edit()
+                        .putBoolean(Common.KEY_HEURISTIC, mCbHeuristic.isChecked())
+                        .putBoolean(Common.KEY_VERBOSE_LOG, mCbVerbose.isChecked())
+                        .apply();
+
                 setLauncherIconEnabled(mCbShowLauncherIcon.isChecked());
 
-                ((MainActivity) getActivity()).refresh(true);
+                if (getActivity() instanceof MainActivity)
+                {
+                    ((MainActivity) getActivity()).refresh(true);
+                }
                 dismiss();
             }
         });
@@ -311,7 +325,7 @@ public class SettingsDialogFragment extends DialogFragment
                     public void onClick(DialogInterface dialog, int which)
                     {
                         mModPref.edit().putString(Common.KEY_USER_BLOCK_PREFIXES, editText.getText().toString().trim()).apply();
-                        Snackbar.make(requireView(), R.string.msg_config_exported, Snackbar.LENGTH_LONG).show();
+                        Snackbar.make(requireView(), R.string.msg_prefixes_saved, Snackbar.LENGTH_LONG).show();
                     }
                 })
                 .setNegativeButton(android.R.string.cancel, null)

@@ -17,7 +17,7 @@ public class Avocarrot extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.blockAdFunction(packageName, AD_CONTROLLER, AD_CONTROLLER_FUNC, lpparam);
+        result |= ApiBlocking.blockAdFunction(packageName, AD_CONTROLLER, AD_CONTROLLER_FUNC, lpparam);
 
         return result;
     }

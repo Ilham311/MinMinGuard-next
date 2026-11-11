@@ -17,7 +17,7 @@ public class Tapfortap extends Blocker
         boolean result = false;
 
         //TODO Does this need to use removeBanner????
-        result = ApiBlocking.removeBanner(packageName, BANNER, "loadAds", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "loadAds", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "show", lpparam);
 
         return result;

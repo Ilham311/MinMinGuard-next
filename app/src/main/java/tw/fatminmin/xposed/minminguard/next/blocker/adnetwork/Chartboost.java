@@ -14,7 +14,7 @@ public class Chartboost extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.blockAdFunction(packageName, BANNER, "showInterstitial", lpparam);
+        result |= ApiBlocking.blockAdFunction(packageName, BANNER, "showInterstitial", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, BANNER, "showRewardedVideo", lpparam);
         result |= ApiBlocking.blockAdFunctionWithResult(packageName, BANNER, "hasInterstitial", false, lpparam);
         result |= ApiBlocking.blockAdFunctionWithResult(packageName, BANNER, "hasRewardedVideo", false, lpparam);

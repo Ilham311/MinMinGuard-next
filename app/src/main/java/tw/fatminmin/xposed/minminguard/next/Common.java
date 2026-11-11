@@ -1,16 +1,21 @@
 package tw.fatminmin.xposed.minminguard.next;
 
-import android.content.res.Resources;
 import android.content.Context;
-
-import tw.fatminmin.xposed.minminguard.next.ui.fragments.MainFragment;
+import android.content.res.Resources;
 
 /**
- * Created by fatminmin on 2015/10/1.
+ * Konstanta bersama antara proses hook (zygote) dan proses UI.
+ * Kelas ini sengaja tidak boleh bergantung pada kelas UI apa pun, karena
+ * dimuat juga di dalam proses aplikasi lain.
  */
 public class Common
 {
     public final static String PACKAGE_NAME = BuildConfig.APPLICATION_ID;
+
+    /** Otoritas ContentProvider satu-satunya. */
+    public final static String AUTHORITY = PACKAGE_NAME;
+    public final static String URI_STATS = "content://" + AUTHORITY + "/stats";
+    public final static String URI_NETWORKS = "content://" + AUTHORITY + "/networks";
 
     public final static String MOD_PREFS = "ModSettings";
     public final static String UI_PREFS = "UI_PREF";
@@ -37,41 +42,59 @@ public class Common
     public final static String VALUE_MODE_BLACKLIST = "blacklist";
     public final static String VALUE_MODE_WHITELIST = "whitelist";
     public final static String KEY_USER_BLOCK_PREFIXES = "user_block_prefixes";
+    public final static String KEY_HEURISTIC = "heuristic_blocking";
+    public final static String KEY_VERBOSE_LOG = "verbose_log";
 
     // Fragment Name
     public final static String FRG_MAIN = "main_fragment";
 
-    // MinMinProvider
+    // Kontrak MinMinProvider
     public final static String KEY_PKG_NAME = "PKG_NAME";
     public final static String KEY_NETWORK = "AD_NETWORKS";
     public final static String KEY_BLOCK_NUM = "BLOCK_NUM";
+    /** Delta hitungan untuk satu jaringan pada satu pemanggilan update(). */
+    public final static String KEY_NETWORK_COUNT = "NETWORK_COUNT";
+
+    // Nama kolom cursor yang dikembalikan URI_STATS / URI_NETWORKS
+    public final static String COL_PKG_NAME = "PKG_NAME";
+    public final static String COL_AD_NETWORKS = "AD_NETWORKS";
+    public final static String COL_BLOCK_NUM = "BLOCK_NUM";
+    public final static String COL_LAST_SEEN = "LAST_SEEN";
+    public final static String COL_NETWORK = "NETWORK";
+    public final static String COL_NETWORK_HIT = "HIT_NUM";
+
+    /** Akhiran kunci preferensi per aplikasi. */
+    public final static String SUFFIX_URL = "_url";
+    public final static String SUFFIX_DNS = "_dns";
+    public final static String SUFFIX_WHITELIST = "_whitelist";
 
     private Common() throws InstantiationException
     {
         throw new InstantiationException("This class is not for instantiation");
     }
 
-    public static String getModeString(MainFragment.FragmentMode mode)
-    {
-        switch (mode)
-        {
-            case AUTO:
-                return Common.VALUE_MODE_AUTO;
-            case BLACKLIST:
-                return Common.VALUE_MODE_BLACKLIST;
-            case WHITELIST:
-                return Common.VALUE_MODE_WHITELIST;
-            default:
-                break;
-        }
-        return Common.VALUE_MODE_BLACKLIST;
-    }
-
     public static String getWhiteListKey(String pkgName)
     {
-        return pkgName + "_whitelist";
+        return pkgName + SUFFIX_WHITELIST;
     }
 
+    public static String getUrlFilterKey(String pkgName)
+    {
+        return pkgName + SUFFIX_URL;
+    }
+
+    public static String getDnsFilterKey(String pkgName)
+    {
+        return pkgName + SUFFIX_DNS;
+    }
+
+    /**
+     * Mode penulisan preferensi modul.
+     * <p>
+     * Pada bridge Xposed &lt; 93 nilainya tetap MODE_PRIVATE; LSPosed &gt;= 93
+     * mem-hook method ini di proses modul dan mengembalikan MODE_WORLD_READABLE
+     * supaya berkas preferensi bisa dibaca proses lain.
+     */
     public static Integer getPrefMode()
     {
         return Context.MODE_PRIVATE;

@@ -8,13 +8,13 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 
 import androidx.activity.EdgeToEdge;
+import androidx.activity.OnBackPressedCallback;
 import androidx.activity.SystemBarStyle;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBarDrawerToggle;
@@ -35,6 +35,7 @@ import androidx.viewpager.widget.ViewPager;
 
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.navigation.NavigationView;
+import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.tabs.TabLayout;
 
 import java.util.ArrayList;
@@ -42,17 +43,19 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import tw.fatminmin.xposed.minminguard.next.Common;
 import tw.fatminmin.xposed.minminguard.next.PrefFileManager;
 import tw.fatminmin.xposed.minminguard.next.R;
-import tw.fatminmin.xposed.minminguard.next.orm.AppData;
-import tw.fatminmin.xposed.minminguard.next.orm.DaoMaster;
+import tw.fatminmin.xposed.minminguard.next.data.StatsRepository;
 import tw.fatminmin.xposed.minminguard.next.ui.adapter.ModeFragmentAdapter;
 import tw.fatminmin.xposed.minminguard.next.ui.dialog.SettingsDialogFragment;
 import tw.fatminmin.xposed.minminguard.next.ui.dialog.StatsDialogFragment;
 import tw.fatminmin.xposed.minminguard.next.ui.fragments.MainFragment;
 import tw.fatminmin.xposed.minminguard.next.ui.models.AppDetails;
+import tw.fatminmin.xposed.minminguard.next.ui.models.AppStats;
 
 public class MainActivity extends AppCompatActivity
 {
@@ -60,6 +63,8 @@ public class MainActivity extends AppCompatActivity
     public volatile ArrayList<AppDetails> masterAppList;
 
     private ArrayList<AppDetails> filteredAppList;
+    /** Kueri pencarian aktif; string kosong berarti tanpa filter. */
+    private String mQuery = "";
     private SharedPreferences uiPref;
     public SharedPreferences modPref;
     private ViewPager mViewPager;
@@ -83,6 +88,10 @@ public class MainActivity extends AppCompatActivity
             {
                 StatsDialogFragment.newInstance().show(getSupportFragmentManager(), "stats");
             }
+            else if (id == R.id.action_reset_stats)
+            {
+                confirmResetStatistics();
+            }
             else if (id == R.id.action_tutorial)
             {
                 showIntro();
@@ -104,6 +113,16 @@ public class MainActivity extends AppCompatActivity
     private ProgressDialog progressDialog;
     private SwipeRefreshLayout swipeRefreshLayout;
     private PrefFileManager prefFileManager;
+
+    /** Satu thread latar untuk memuat daftar aplikasi. */
+    private final ExecutorService mLoader = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "mmg-apps");
+        t.setDaemon(true);
+        return t;
+    });
+
+    /** Mencegah pemuatan bertumpuk saat swipe-refresh dan pindah tab beruntun. */
+    private final java.util.concurrent.atomic.AtomicBoolean mLoading = new java.util.concurrent.atomic.AtomicBoolean(false);
 
     @Override
     public void attachBaseContext(Context newBase)
@@ -208,6 +227,7 @@ public class MainActivity extends AppCompatActivity
                 {
                     fragment.refreshUI();
                 }
+                applyFilter();
                 refresh(true);
             }
 
@@ -281,30 +301,65 @@ public class MainActivity extends AppCompatActivity
         });
 
         refresh(true);
+
+        // Predictive back (Android 13+, wajib di targetSdk 36): onBackPressed()
+        // tidak lagi dipanggil. Gunakan OnBackPressedCallback.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true)
+        {
+            @Override
+            public void handleOnBackPressed()
+            {
+                if (mDrawerLayout.isDrawerOpen(GravityCompat.START))
+                {
+                    mDrawerLayout.closeDrawer(GravityCompat.START);
+                    return;
+                }
+                if (mDrawerLayout.isDrawerOpen(GravityCompat.END))
+                {
+                    mDrawerLayout.closeDrawer(GravityCompat.END);
+                    return;
+                }
+                setEnabled(false);
+                getOnBackPressedDispatcher().onBackPressed();
+                setEnabled(true);
+            }
+        });
     }
+
+    /** True bila daftar sudah pernah dimuat di sesi activity ini. */
+    private boolean mLoadedOnce;
 
     @Override
     public void onResume()
     {
-        refresh(false);
+        if (!mLoadedOnce)
+        {
+            // Pemuatan pertama (atau setelah activity dibuat ulang).
+            mLoadedOnce = true;
+            refresh(false);
+        }
         super.onResume();
     }
 
-    @Override
-    public void onBackPressed()
+    /**
+     * Memuat ulang hitungan iklan tanpa membaca ulang daftar aplikasi.
+     * Dipanggil setelah statistik satu aplikasi dihapus dari dialog detail.
+     */
+    public void refreshStatsOnly()
     {
-        if (mDrawerLayout.isDrawerOpen(GravityCompat.START))
+        MainFragment fragment = getFragmentAt(mViewPager == null ? 0 : mViewPager.getCurrentItem());
+        if (fragment != null && fragment.isAlive)
         {
-            mDrawerLayout.closeDrawer(GravityCompat.START);
-            return;
+            fragment.updateStats();
         }
-        else if (mDrawerLayout.isDrawerOpen(GravityCompat.END))
-        {
-            mDrawerLayout.closeDrawer(GravityCompat.END);
-            return;
-        }
+    }
 
-        moveTaskToBack(true);
+
+    @Override
+    protected void onDestroy()
+    {
+        mLoader.shutdownNow();
+        super.onDestroy();
     }
 
     @Override
@@ -337,11 +392,6 @@ public class MainActivity extends AppCompatActivity
         return mToggle.onOptionsItemSelected(item) || super.onOptionsItemSelected(item);
     }
 
-    private MainFragment getCurrentFragment()
-    {
-        return getFragmentAt(mViewPager.getCurrentItem());
-    }
-
     private MainFragment getFragmentAt(int position)
     {
         Fragment fragment = getSupportFragmentManager()
@@ -359,144 +409,219 @@ public class MainActivity extends AppCompatActivity
         startActivity(intent);
     }
 
-    public void refresh(final boolean displayProgressDialog)
+    private void confirmResetStatistics()
     {
-        new AsyncTask<Void, Void, Void>()
-        {
-
-            @Override
-            protected void onPreExecute()
-            {
-                if (displayProgressDialog)
-                {
-                    progressDialog.show();
-                }
-            }
-
-            @Override
-            protected Void doInBackground(Void... voids)
-            {
-                updateAppList(getPackageManager());
-                return null;
-            }
-
-            @Override
-            protected void onPostExecute(Void aVoid)
-            {
-                getCurrentFragment().updateAndNotify(masterAppList);
-                progressDialog.dismiss();
-                swipeRefreshLayout.setRefreshing(false);
-            }
-        }.execute();
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.setting_reset_stats)
+                .setMessage(R.string.setting_reset_stats_confirm)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    StatsRepository.clearAll(this);
+                    refresh(false);
+                    Snackbar.make(findViewById(R.id.drawer_layout),
+                            R.string.msg_stats_reset, Snackbar.LENGTH_SHORT).show();
+                })
+                .show();
     }
 
-    private void updateAppList(final PackageManager pm)
+    public void refresh(final boolean displayProgressDialog)
+    {
+        // Abaikan permintaan yang datang saat pemuatan masih berjalan. Sebelumnya
+        // setiap swipe/tab switch menumpuk satu tugas di executor tunggal sehingga
+        // daftar bisa ter-render beberapa kali berturut-turut dengan data lama.
+        if (!mLoading.compareAndSet(false, true))
+        {
+            // Permintaan ini tidak akan memuat apa pun, jadi jangan tinggalkan
+            // spinner berputar.
+            if (swipeRefreshLayout != null)
+            {
+                swipeRefreshLayout.setRefreshing(false);
+            }
+            return;
+        }
+
+        if (displayProgressDialog && progressDialog != null)
+        {
+            progressDialog.show();
+        }
+
+        mLoader.execute(() -> {
+            final ArrayList<AppDetails> list;
+            try
+            {
+                list = buildAppList(getPackageManager());
+            }
+            catch (Throwable t)
+            {
+                runOnUiThread(() -> finishRefresh(null));
+                return;
+            }
+            runOnUiThread(() -> finishRefresh(list));
+        });
+    }
+
+    private void finishRefresh(ArrayList<AppDetails> list)
+    {
+        mLoading.set(false);
+
+        // Spinner dan dialog harus selalu berhenti, termasuk ketika activity
+        // sedang selesai; kalau tidak, pengguna melihat spinner yang macet.
+        if (progressDialog != null && progressDialog.isShowing())
+        {
+            progressDialog.dismiss();
+        }
+        if (swipeRefreshLayout != null)
+        {
+            swipeRefreshLayout.setRefreshing(false);
+        }
+
+        if (isFinishing() || isDestroyed())
+        {
+            return;
+        }
+        if (list != null)
+        {
+            masterAppList = list;
+            applyFilter();
+        }
+    }
+
+    private ArrayList<AppDetails> buildAppList(final PackageManager pm)
     {
         boolean showSystemApps = uiPref.getBoolean(Common.KEY_SHOW_SYSTEM_APPS, false);
         String sort = uiPref.getString(Common.KEY_SORT, Common.VALUE_SORT_NAME);
+        MainFragment.FragmentMode mode = currentMode();
         ArrayList<AppDetails> temp = new ArrayList<>();
+        SharedPreferences.Editor defaults = null;
 
         for (PackageInfo info : pm.getInstalledPackages(0))
         {
-            if (showSystemApps || (info.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 0)
+            boolean isSystem = (info.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
+
+            if (showSystemApps || !isSystem)
             {
-                String name = (String) info.applicationInfo.loadLabel(pm);
+                String name = String.valueOf(info.applicationInfo.loadLabel(pm));
                 String packageName = info.packageName;
-                boolean isEnabled = isPackageEnabled(packageName);
-
-                temp.add(new AppDetails(name, packageName, info.applicationInfo, isEnabled));
+                temp.add(new AppDetails(name, packageName, info.applicationInfo,
+                        isPackageEnabled(packageName, mode)));
             }
 
-            // setting initial value for system apps
-            if ((info.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 1 && !modPref.contains(info.packageName))
+            // Nilai awal untuk aplikasi sistem yang belum pernah disentuh.
+            if (isSystem && !modPref.contains(info.packageName))
             {
-                modPref.edit().putBoolean(info.packageName, false).putBoolean(Common.getWhiteListKey(info.packageName), true).apply();
+                if (defaults == null)
+                {
+                    defaults = modPref.edit();
+                }
+                defaults.putBoolean(info.packageName, false)
+                        .putBoolean(Common.getWhiteListKey(info.packageName), true);
             }
+        }
+
+        if (defaults != null)
+        {
+            defaults.apply();
         }
 
         if (Common.VALUE_SORT_PACKAGE.equals(sort))
         {
-            Collections.sort(temp, new Comparator<AppDetails>()
-            {
-                @Override
-                public int compare(AppDetails l, AppDetails r)
-                {
-                    return l.getPackageName().compareToIgnoreCase(r.getPackageName());
-                }
-            });
+            Collections.sort(temp, (l, r) -> l.getPackageName().compareToIgnoreCase(r.getPackageName()));
         }
         else if (Common.VALUE_SORT_BLOCKED.equals(sort))
         {
             final Map<String, Integer> blockCounts = new HashMap<>();
-            try
+            for (AppStats stats : StatsRepository.loadStats(this).values())
             {
-                DaoMaster.DevOpenHelper helper = new DaoMaster.DevOpenHelper(this, "mmg", null);
-                for (AppData data : new DaoMaster(helper.getWritableDatabase()).newSession().getAppDataDao().loadAll())
-                {
-                    blockCounts.put(data.getPkgName(), data.getBlockNum());
-                }
-                helper.close();
-            }
-            catch (Exception ignored)
-            {
+                blockCounts.put(stats.getPackageName(), stats.getBlockNum());
             }
 
-            Collections.sort(temp, new Comparator<AppDetails>()
-            {
-                @Override
-                public int compare(AppDetails l, AppDetails r)
-                {
-                    int rc = Integer.compare(
-                            blockCounts.containsKey(r.getPackageName()) ? blockCounts.get(r.getPackageName()) : 0,
-                            blockCounts.containsKey(l.getPackageName()) ? blockCounts.get(l.getPackageName()) : 0);
-                    return rc != 0 ? rc : l.getName().compareToIgnoreCase(r.getName());
-                }
+            Collections.sort(temp, (l, r) -> {
+                int lc = blockCounts.containsKey(l.getPackageName()) ? blockCounts.get(l.getPackageName()) : 0;
+                int rc = blockCounts.containsKey(r.getPackageName()) ? blockCounts.get(r.getPackageName()) : 0;
+                int cmp = Integer.compare(rc, lc);
+                return cmp != 0 ? cmp : l.getName().compareToIgnoreCase(r.getName());
             });
         }
         else
         {
-            Collections.sort(temp, new Comparator<AppDetails>()
-            {
-                @Override
-                public int compare(AppDetails l, AppDetails r)
-                {
-                    return l.getName().compareToIgnoreCase(r.getName());
-                }
-            });
+            Collections.sort(temp, (l, r) -> l.getName().compareToIgnoreCase(r.getName()));
         }
 
-        masterAppList = temp;
+        return temp;
     }
 
-    private boolean isPackageEnabled(String pkgName)
+    /** Mode fragment yang sedang tampil; aman dipanggil dari thread latar. */
+    private MainFragment.FragmentMode currentMode()
     {
-        if (getCurrentFragment().getMode() == MainFragment.FragmentMode.AUTO)
+        int item = mViewPager == null ? 1 : mViewPager.getCurrentItem();
+        switch (item)
+        {
+            case 0:
+                return MainFragment.FragmentMode.AUTO;
+            case 2:
+                return MainFragment.FragmentMode.WHITELIST;
+            case 1:
+            default:
+                return MainFragment.FragmentMode.BLACKLIST;
+        }
+    }
+
+    private boolean isPackageEnabled(String pkgName, MainFragment.FragmentMode mode)
+    {
+        if (mode == MainFragment.FragmentMode.AUTO)
         {
             return true;
         }
-
-        if (getCurrentFragment().getMode() == MainFragment.FragmentMode.BLACKLIST)
+        if (mode == MainFragment.FragmentMode.BLACKLIST)
         {
             return modPref.getBoolean(pkgName, false);
         }
-
         return modPref.getBoolean(Common.getWhiteListKey(pkgName), false);
     }
 
     private void filterAppList(String keyword)
     {
-        filteredAppList.clear();
-        String lower = keyword.toLowerCase();
+        mQuery = keyword == null ? "" : keyword.trim().toLowerCase();
+        applyFilter();
+    }
 
-        for (AppDetails info : masterAppList)
+    /**
+     * Menyusun daftar tampil dari {@link #masterAppList} menurut kueri aktif
+     * lalu menyetorkannya ke semua fragmen tab (bukan hanya tab yang sedang
+     * tampil) supaya hasil pencarian konsisten ketika pengguna berpindah tab.
+     */
+    private void applyFilter()
+    {
+        if (masterAppList == null || mAdapter == null)
         {
-            if (info.getName().toLowerCase().contains(lower)
-                    || info.getPackageName().toLowerCase().contains(lower))
+            return;
+        }
+
+        if (mQuery.isEmpty())
+        {
+            filteredAppList = new ArrayList<>();
+        }
+        else
+        {
+            filteredAppList.clear();
+            for (AppDetails info : masterAppList)
             {
-                filteredAppList.add(info);
+                if (info.getName().toLowerCase().contains(mQuery)
+                        || info.getPackageName().toLowerCase().contains(mQuery))
+                {
+                    filteredAppList.add(info);
+                }
             }
         }
 
-        getCurrentFragment().updateAndNotify(filteredAppList);
+        ArrayList<AppDetails> shown = mQuery.isEmpty() ? masterAppList : filteredAppList;
+        for (int i = 0; i < mAdapter.getCount(); i++)
+        {
+            MainFragment fragment = getFragmentAt(i);
+            if (fragment != null && fragment.isAlive)
+            {
+                fragment.updateAndNotify(shown);
+            }
+        }
     }
 }

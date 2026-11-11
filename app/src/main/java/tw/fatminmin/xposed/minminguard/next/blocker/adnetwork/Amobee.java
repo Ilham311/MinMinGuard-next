@@ -14,7 +14,7 @@ public class Amobee extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.blockAdFunction(packageName, BANNER, "getAd", lpparam);
+        result |= ApiBlocking.blockAdFunction(packageName, BANNER, "getAd", lpparam);
 
         return result;
     }

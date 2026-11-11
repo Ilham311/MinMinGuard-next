@@ -17,7 +17,7 @@ public class Vpadn extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "loadAd", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "loadAd", lpparam);
 
         result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "show", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, NATIVE_ADS, "loadAd", lpparam);

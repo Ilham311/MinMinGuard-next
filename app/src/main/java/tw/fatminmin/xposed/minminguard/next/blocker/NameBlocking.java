@@ -1,137 +1,186 @@
 package tw.fatminmin.xposed.minminguard.next.blocker;
 
 import android.app.Activity;
-import android.content.Context;
 import android.view.View;
 import android.view.ViewGroup;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XSharedPreferences;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
-import tw.fatminmin.xposed.minminguard.next.Common;
 import tw.fatminmin.xposed.minminguard.next.Main;
 
 /**
- * Created by fatminmin on 2015/10/27.
+ * Pemblokiran berbasis nama kelas view.
+ * <p>
+ * Dipakai untuk SDK yang memakai nama kelas tetap (tidak di-obfuscate), dan
+ * sebagai jaring pengaman ketika hook API tidak menemukan signature yang
+ * cocok. Tiga titik pemasangan dipilih karena setiap UI Android melewati
+ * salah satunya: {@code ViewGroup.addView}, {@code Activity.setContentView},
+ * dan {@code LayoutInflater.inflate}.
  */
 public final class NameBlocking
 {
-    private static List<String> userPrefixes;
+    /** Batas kedalaman penelusuran pohon view. */
+    private static final int MAX_DEPTH = 64;
 
-    private static boolean matchBannerName(String clazzName, String banner, String bannerPrefix)
+    /** Akhiran nama kelas yang hampir selalu berarti container iklan. */
+    private static final String[] HEURISTIC_SUFFIXES = {
+            "AdView", "AdViewGroup", "AdContainer", "AdLayout", "AdWrapper",
+            "BannerView", "BannerLayout", "NativeAdView", "NativeAdLayout",
+            "InterstitialAdView", "AdFrameLayout", "AdRelativeLayout",
+    };
+
+    /** Prefix yang bukan iklan meskipun mengandung kata "ad". */
+    private static final String[] IGNORED_PREFIXES = {
+            "android.", "androidx.", "com.android.", "java.", "kotlin.",
+            "com.google.android.material.",
+    };
+
+    private NameBlocking() throws InstantiationException
     {
-        if (banner != null && banner.equals(clazzName))
+        throw new InstantiationException("This class is not for instantiation");
+    }
+
+    private static boolean matchBannerName(String className, String banner, String bannerPrefix)
+    {
+        if (banner != null && banner.equals(className))
         {
             return true;
         }
-
-        return bannerPrefix != null && clazzName.startsWith(bannerPrefix);
+        return bannerPrefix != null && className.startsWith(bannerPrefix);
     }
 
-    private static List<String> getUserPrefixes()
+    /**
+     * @return nama jaringan iklan, atau {@code null} bila view bukan iklan.
+     */
+    public static String classify(String className)
     {
-        if (userPrefixes != null)
+        if (className == null)
         {
-            return userPrefixes;
+            return null;
         }
 
-        userPrefixes = new ArrayList<>();
-
-        try
+        for (String ignored : IGNORED_PREFIXES)
         {
-            XSharedPreferences prefs = new XSharedPreferences(Main.class.getPackage().getName(), Common.MOD_PREFS);
-            if (prefs.getFile().canRead())
+            if (className.startsWith(ignored))
             {
-                String prefixes = prefs.getString(Common.KEY_USER_BLOCK_PREFIXES, "");
-                if (prefixes != null)
-                {
-                    for (String line : prefixes.split("\n"))
-                    {
-                        String prefix = line.trim();
-                        if (prefix.length() > 0)
-                        {
-                            userPrefixes.add(prefix);
-                        }
-                    }
-                }
+                return null;
             }
         }
-        catch (Throwable ignored)
+
+        // Kasus khusus: SDK lama Google.
+        if (className.startsWith("com.google.ads."))
         {
+            return "GoogleAdmob";
         }
 
-        return userPrefixes;
-    }
-
-    // return adnetwork name
-    private static Boolean isAdView(Context context, String pkgName, String clazzName)
-    {
-        // android widgets
-        if (clazzName.startsWith("android"))
-            return false;
-
-        // corner case
-        if (clazzName.startsWith("com.google.ads"))
-            return true;
-
-        // user defined class prefixes
-        for (String prefix : getUserPrefixes())
+        // Prefix tambahan dari pengguna.
+        for (String prefix : BlockPrefs.get().getUserPrefixes())
         {
-            if (clazzName.startsWith(prefix))
+            if (className.startsWith(prefix))
             {
-                Util.notifyAdNetwork(context, pkgName, "Custom");
-                return true;
+                return "Custom";
             }
         }
 
         for (Blocker blocker : Main.blockers)
         {
-            String name = blocker.getClass().getSimpleName();
-            String banner = blocker.getBanner();
-            String bannerPrefix = blocker.getBannerPrefix();
-
-            // prefix is used to detect adview obfuscate by proguard
-            if (matchBannerName(clazzName, banner, bannerPrefix))
+            // Prefix menangkap kelas yang di-obfuscate selama awalan paket tetap.
+            if (matchBannerName(className, blocker.getBanner(), blocker.getBannerPrefix()))
             {
-                Util.notifyAdNetwork(context, pkgName, name);
-
-                return true;
+                return blocker.getName();
             }
         }
-        return false;
-    }
 
-    private static Boolean isAdView(Context context, String pkgName, View view)
-    {
-        Class clazz = view.getClass();
-
-        if (clazz != null)
+        if (BlockPrefs.get().isHeuristicEnabled())
         {
-            return isAdView(context, pkgName, clazz.getName());
+            String simple = simpleName(className);
+            for (String suffix : HEURISTIC_SUFFIXES)
+            {
+                if (endsWithWord(simple, suffix))
+                {
+                    return "Heuristic";
+                }
+            }
         }
 
-        return false;
+        return null;
     }
 
-    private static void clearAdViewInLayout(final String packageName, final View view)
+    /**
+     * Pencocokan akhiran pada batas kata.
+     * <p>
+     * Tanpa ini {@code HeadView} ikut cocok dengan akhiran {@code AdView}
+     * (huruf "ad" di tengah kata) dan view aplikasi biasa ikut dihapus.
+     */
+    private static boolean endsWithWord(String simple, String suffix)
     {
+        if (simple.equals(suffix))
+        {
+            return true;
+        }
+        if (!simple.endsWith(suffix) || simple.length() <= suffix.length())
+        {
+            return false;
+        }
+        char before = simple.charAt(simple.length() - suffix.length() - 1);
+        return Character.isUpperCase(before) || Character.isDigit(before);
+    }
 
-        if (isAdView(view.getContext(), packageName, view))
+    private static String simpleName(String className)
+    {
+        int dot = className.lastIndexOf('.');
+        String simple = dot >= 0 ? className.substring(dot + 1) : className;
+        int dollar = simple.lastIndexOf('$');
+        return dollar >= 0 ? simple.substring(dollar + 1) : simple;
+    }
+
+    public static boolean isAdView(String pkgName, View view)
+    {
+        if (view == null)
+        {
+            return false;
+        }
+
+        String network = classify(view.getClass().getName());
+        if (network == null)
+        {
+            return false;
+        }
+
+        Util.notifyAdNetwork(view.getContext(), pkgName, network);
+        return true;
+    }
+
+    public static void clearAdViewInLayout(String packageName, View view)
+    {
+        clearAdViewInLayout(packageName, view, 0);
+    }
+
+    /**
+     * @param depth kedalaman rekursi, dibatasi agar pohon view yang sangat
+     *              dalam tidak menghabiskan waktu pada setiap inflate.
+     */
+    private static void clearAdViewInLayout(String packageName, View view, int depth)
+    {
+        if (view == null || depth > MAX_DEPTH)
+        {
+            return;
+        }
+
+        if (isAdView(packageName, view))
         {
             ViewBlocking.removeAdView(packageName, view);
             Util.log(packageName, "clearAdViewInLayout: " + view.getClass().getName());
+            // Subtree iklan dibuang seluruhnya; tidak perlu ditelusuri lagi.
+            return;
         }
 
         if (view instanceof ViewGroup)
         {
-            ViewGroup vg = (ViewGroup) view;
-
-            for (int i = 0; i < vg.getChildCount(); i++)
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++)
             {
-                clearAdViewInLayout(packageName, vg.getChildAt(i));
+                clearAdViewInLayout(packageName, group.getChildAt(i), depth + 1);
             }
         }
     }
@@ -140,28 +189,24 @@ public final class NameBlocking
     {
         Util.hookAllMethods("android.view.ViewGroup", lpparam.classLoader, "addView", new XC_MethodHook()
         {
-
             @Override
             protected void beforeHookedMethod(MethodHookParam param)
             {
-                View view = (View) param.args[0];
-
-                if (view != null && isAdView(view.getContext(), pkgName, view))
+                if (param.args.length == 0 || !(param.args[0] instanceof View))
                 {
-                    Util.log(pkgName, "NameBasedBlocking before addView: " + view.getClass().getName());
-                    ViewBlocking.removeAdView(pkgName, view);
+                    return;
                 }
-            }
-
-            @Override
-            protected void afterHookedMethod(MethodHookParam param)
-            {
                 View view = (View) param.args[0];
-
-                if (view != null && isAdView(view.getContext(), pkgName, view))
+                if (isAdView(pkgName, view))
                 {
-                    Util.log(pkgName, "NameBasedBlocking after addView: " + view.getClass().getName());
+                    Util.log(pkgName, "addView: " + view.getClass().getName());
                     ViewBlocking.removeAdView(pkgName, view);
+                    // Jangan tambahkan view iklan sama sekali, sehingga parent
+                    // tidak perlu menata ulang tata letak untuknya.
+                    if (view.getParent() == null)
+                    {
+                        param.setResult(null);
+                    }
                 }
             }
         });
@@ -171,35 +216,31 @@ public final class NameBlocking
             @Override
             protected void afterHookedMethod(MethodHookParam param)
             {
-                Activity ac = (Activity) (param.thisObject);
-                ViewGroup root = ac.getWindow().getDecorView().findViewById(android.R.id.content);
-
-                clearAdViewInLayout(pkgName, root);
+                Activity activity = (Activity) param.thisObject;
+                if (activity == null || activity.getWindow() == null)
+                {
+                    return;
+                }
+                View decor = activity.getWindow().getDecorView();
+                View root = decor.findViewById(android.R.id.content);
+                clearAdViewInLayout(pkgName, root != null ? root : decor);
             }
         });
 
         Util.hookAllMethods("android.view.LayoutInflater", lpparam.classLoader, "inflate", new XC_MethodHook()
         {
-
-            /*
-              http://developer.android.com/intl/zh-tw/reference/android/view/LayoutInflater.html
-              inflate(int resource, ViewGroup root)
-              inflate(XmlPullParser parser, ViewGroup root)
-              inflate(XmlPullParser parser, ViewGroup root, boolean attachToRoot)
-              inflate(int resource, ViewGroup root, boolean attachToRoot)
-
-                Returns
-                The root View of the inflated hierarchy. If root was supplied and attachToRoot is true,
-                this is root; otherwise it is the root of the inflated XML file.
-             */
-
             @Override
             protected void afterHookedMethod(MethodHookParam param)
             {
-                View root = (View) param.getResult();
-
-                if (root != null)
-                    clearAdViewInLayout(pkgName, root);
+                // Semua overload mengembalikan root view (atau root yang
+                // diberikan bila attachToRoot true), jadi selalu objek View.
+                Object result = param.getResult();
+                if (result instanceof View)
+                {
+                    // Hanya root hasil inflate yang diperiksa: menelusuri
+                    // seluruh subview di setiap inflate membuat startup lambat.
+                    clearAdViewInLayout(pkgName, (View) result, 0);
+                }
             }
         });
     }

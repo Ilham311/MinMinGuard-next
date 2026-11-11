@@ -33,7 +33,7 @@ public class Intowow extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, BANNER_FUNC, lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, BANNER_FUNC, lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, SPLASH_AD, SPLASH_AD_FUNC, lpparam);
 
         result |= ApiBlocking.blockAdFunctionWithResult(packageName, I2WAPI, API_FUNC_1, null, lpparam);

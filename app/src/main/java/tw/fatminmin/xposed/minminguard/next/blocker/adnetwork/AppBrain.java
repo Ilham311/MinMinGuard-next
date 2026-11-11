@@ -14,7 +14,7 @@ public class AppBrain extends Blocker
     {
         boolean result = false;
 
-        result = ApiBlocking.removeBanner(packageName, BANNER, "requestAd", lpparam);
+        result |= ApiBlocking.removeBanner(packageName, BANNER, "requestAd", lpparam);
         result |= ApiBlocking.blockAdFunction(packageName, INTER_ADS, "getAds", lpparam);
 
         return result;

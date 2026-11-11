@@ -1,6 +1,6 @@
 package tw.fatminmin.xposed.minminguard.next.blocker;
 
-import android.content.Context;
+import android.app.Activity;
 import android.os.Bundle;
 
 import java.util.ArrayList;
@@ -8,30 +8,78 @@ import java.util.Arrays;
 import java.util.List;
 
 import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XSharedPreferences;
-import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
-import tw.fatminmin.xposed.minminguard.next.Common;
-import tw.fatminmin.xposed.minminguard.next.Main;
 
 /**
- * Finishes known interstitial / full screen ad activities before they are created.
+ * Menutup aktivitas interstitial / full screen milik SDK iklan sebelum
+ * tampil. Ini satu-satunya lapisan yang bisa mencegah iklan layar penuh yang
+ * dimuat oleh SDK tanpa view banner.
  */
 public final class ActivityBlocking
 {
+    /**
+     * Prefix nama aktivitas iklan yang dikenal. Dikelompokkan menurut SDK
+     * agar mudah diperbarui saat SDK mengganti nama kelasnya.
+     */
     private static final List<String> KNOWN_ACTIVITY_PREFIXES = new ArrayList<>(Arrays.asList(
+            // Google AdMob / GMS
             "com.google.android.gms.ads.AdActivity",
+
+            // ByteDance / Pangle
             "com.bytedance.sdk.openadsdk.activity.TTInterstitialActivity",
             "com.bytedance.sdk.openadsdk.activity.TTFullScreenVideoActivity",
             "com.bytedance.sdk.openadsdk.activity.TTRewardVideoActivity",
             "com.bytedance.sdk.openadsdk.activity.TTAppOpenAdActivity",
+            "com.bytedance.sdk.openadsdk.activity.TTRewardExpressVideoActivity",
+
+            // Mintegral / Mobvista
             "com.mintegral.msdk.activity.MTGInterstitialActivity",
             "com.mintegral.msdk.activity.MTGRewardActivity",
+            "com.mintegral.msdk.activity.MTGAppOpenAdActivity",
+
+            // Tapjoy
             "com.tapjoy.TJAdUnitActivity",
             "com.tapjoy.TJContentActivity",
+
+            // Tencent GDT
             "com.qq.e.ads.ADActivity",
             "com.qq.e.ads.rewardvideo.RewardVideoADActivity",
-            "com.unity3d.services.ads.adunit.AdUnitActivity"
+            "com.qq.e.ads.PortraitADActivity",
+            "com.qq.e.ads.LandscapeADActivity",
+
+            // Unity Ads
+            "com.unity3d.services.ads.adunit.AdUnitActivity",
+            "com.unity3d.ads.adunit.AdUnitActivity",
+
+            // AppLovin MAX
+            "com.applovin.adview.AppLovinInterstitialActivity",
+            "com.applovin.adview.AppLovinFullscreenActivity",
+            "com.applovin.mediation.MaxAdActivity",
+            "com.applovin.impl.adview.activity.FullscreenAdActivity",
+
+            // ironSource
+            "com.ironsource.sdk.controller.ControllerActivity",
+            "com.ironsource.sdk.controller.InterstitialActivity",
+            "com.ironsource.sdk.controller.OpenUrlActivity",
+
+            // Vungle
+            "com.vungle.warren.ui.VungleActivity",
+            "com.vungle.ads.internal.ui.PresenterAdOpenActivity",
+
+            // Chartboost / AdColony / Smaato / Fyber / MoPub / AppNext
+            "com.chartboost.sdk.impl.CBActivity",
+            "com.adcolony.sdk.AdColonyInterstitialActivity",
+            "com.smaato.sdk.interstitial.InterstitialActivity",
+            "com.fyber.inneractive.sdk.activities.FullscreenActivity",
+            "com.fyber.inneractive.sdk.activities.InternalStoreActivity",
+            "com.mopub.mobileads.MoPubActivity",
+            "com.mopub.common.MoPubBrowser",
+            "com.appnext.ads.interstitial.InterstitialActivity",
+
+            // TopOn
+            "com.anythink.interstitial.activity.ATInterstitialActivity",
+            "com.anythink.rewardvideo.activity.ATRewardVideoActivity",
+            "com.anythink.splashad.activity.ATSplashActivity"
     ));
 
     private ActivityBlocking() throws InstantiationException
@@ -41,65 +89,135 @@ public final class ActivityBlocking
 
     public static void blockInterstitialActivities(final String packageName, final XC_LoadPackage.LoadPackageParam lpparam)
     {
-        try
-        {
-            XposedHelpers.findAndHookMethod("android.app.Activity", lpparam.classLoader, "onCreate", Bundle.class, new XC_MethodHook()
-            {
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param)
+        Util.hookMethod("android.app.Activity", lpparam.classLoader, "onCreate", new Object[]{
+                Bundle.class,
+                new XC_MethodHook()
                 {
-                    android.app.Activity activity = (android.app.Activity) param.thisObject;
-                    String name = activity.getClass().getName();
-
-                    if (matches(name, packageName, lpparam))
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param)
                     {
-                        Util.log(packageName, "Finishing ad activity: " + name);
-                        Util.notifyRemoveAdView(null, packageName, 1);
+                        Activity activity = (Activity) param.thisObject;
+                        if (activity == null)
+                        {
+                            return;
+                        }
+
+                        String name = activity.getClass().getName();
+                        String network = classify(name);
+                        if (network == null)
+                        {
+                            return;
+                        }
+
+                        Util.log(packageName, "menutup aktivitas iklan: " + name);
+                        Util.notifyAdNetwork(activity, packageName, network);
+                        Util.notifyRemoveAdView(activity, packageName, 1);
+
+                        // finish() sebelum konten dimuat menghindari animasi
+                        // transisi dan membebaskan memori lebih cepat.
                         activity.finish();
+                        param.setResult(null);
                     }
                 }
-            });
-        }
-        catch (Throwable t)
-        {
-            Util.log(packageName, "ActivityBlocking: " + t);
-        }
+        });
     }
 
-    private static boolean matches(String activityName, String packageName, XC_LoadPackage.LoadPackageParam lpparam)
+    /**
+     * @return nama jaringan bila aktivitas ini milik SDK iklan, selain itu null.
+     */
+    public static String classify(String activityName)
     {
+        if (activityName == null)
+        {
+            return null;
+        }
+
         for (String prefix : KNOWN_ACTIVITY_PREFIXES)
         {
             if (activityName.startsWith(prefix))
             {
-                return true;
+                return networkFor(prefix);
             }
         }
 
-        // User defined prefixes are stored in the module prefs.
-        try
+        // Aktivitas khusus yang ditambahkan pengguna lewat preferensi.
+        for (String prefix : BlockPrefs.get().getUserPrefixes())
         {
-            XSharedPreferences prefs = new XSharedPreferences(Main.class.getPackage().getName(), Common.MOD_PREFS);
-            if (prefs.getFile().canRead())
+            if (activityName.startsWith(prefix))
             {
-                String prefixes = prefs.getString(Common.KEY_USER_BLOCK_PREFIXES, "");
-                if (prefixes != null)
-                {
-                    for (String line : prefixes.split("\n"))
-                    {
-                        String prefix = line.trim();
-                        if (prefix.length() > 0 && activityName.startsWith(prefix))
-                        {
-                            return true;
-                        }
-                    }
-                }
+                return "Custom";
             }
         }
-        catch (Throwable ignored)
-        {
-        }
 
-        return false;
+        return null;
+    }
+
+    private static String networkFor(String prefix)
+    {
+        if (prefix.startsWith("com.google.") || prefix.startsWith("com.google.android.gms"))
+        {
+            return "GoogleAdmob";
+        }
+        if (prefix.startsWith("com.bytedance") || prefix.startsWith("com.pangle"))
+        {
+            return "Pangle";
+        }
+        if (prefix.startsWith("com.mintegral"))
+        {
+            return "Mintegral";
+        }
+        if (prefix.startsWith("com.tapjoy"))
+        {
+            return "Tapjoy";
+        }
+        if (prefix.startsWith("com.qq.e"))
+        {
+            return "TencentGDT";
+        }
+        if (prefix.startsWith("com.unity3d"))
+        {
+            return "UnityAds";
+        }
+        if (prefix.startsWith("com.applovin"))
+        {
+            return "Applovin";
+        }
+        if (prefix.startsWith("com.ironsource"))
+        {
+            return "Ironsource";
+        }
+        if (prefix.startsWith("com.vungle"))
+        {
+            return "Vungle";
+        }
+        if (prefix.startsWith("com.chartboost"))
+        {
+            return "Chartboost";
+        }
+        if (prefix.startsWith("com.adcolony"))
+        {
+            return "Adcolony";
+        }
+        if (prefix.startsWith("com.smaato"))
+        {
+            return "Smaato";
+        }
+        if (prefix.startsWith("com.fyber"))
+        {
+            return "Fyber";
+        }
+        if (prefix.startsWith("com.mopub"))
+        {
+            return "MoPub";
+        }
+        if (prefix.startsWith("com.appnext"))
+        {
+            return "Appnext";
+        }
+        if (prefix.startsWith("com.anythink"))
+        {
+            return "TopOn";
+        }
+        return "Interstitial";
     }
 }
