@@ -5,6 +5,8 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.net.Uri;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -43,8 +45,15 @@ public final class StatsReporter
         return t;
     });
 
-    /** pkg -> [blockDelta, map jaringan -> hitDelta]. */
-    private final Map<String, Pending> mPending = new ConcurrentHashMap<>();
+    /**
+     * pkg -> [blockDelta, map jaringan -> hitDelta].
+     * <p>
+     * Tipe konkret {@code ConcurrentHashMap}, bukan {@code Map}: {@code
+     * putIfAbsent}/{@code remove(k,v)} pada antarmuka {@code Map} adalah default
+     * method API 24, sementara versi {@code ConcurrentMap} sudah ada sejak
+     * API 1 (minSdk modul 21).
+     */
+    private final ConcurrentHashMap<String, Pending> mPending = new ConcurrentHashMap<>();
 
     private volatile Future<?> mScheduledFlush;
 
@@ -124,8 +133,201 @@ public final class StatsReporter
         scheduleFlush();
     }
 
-    public void recordNetwork(String pkgName, String network)
+    /**
+     * Paket yang sudah didaftarkan sebagai "aktif" di proses ini.
+     * <p>
+     * Memakai {@code newSetFromMap} karena {@code ConcurrentHashMap.newKeySet()}
+     * baru ada di API 24, sedangkan minSdk modul ini 21 — memanggilnya di
+     * Android 5–6 akan melempar {@code NoSuchMethodError} dan mematikan
+     * pelaporan statistik.
+     */
+    private final Set<String> mRegistered = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
+
+    /**
+     * Pendaftaran yang belum berhasil, beserta jumlah percobaan.
+     * <p>
+     * Dibersihkan setelah {@link #MAX_REGISTER_ATTEMPTS}; jumlahnya dibatasi
+     * oleh jumlah aplikasi di scope, jadi tidak perlu batas tambahan.
+     */
+    private final ConcurrentHashMap<String, Registration> mRetry = new ConcurrentHashMap<>();
+
+    /** Batas percobaan pendaftaran agar tidak mencoba selamanya. */
+    private static final int MAX_REGISTER_ATTEMPTS = 8;
+
+    /** Jeda sebelum pendaftaran yang gagal dicoba lagi (ms). */
+    private static final long REGISTER_RETRY_DELAY_MS = 1_500L;
+
+    /**
+     * Penjaga agar satu percobaan ulang saja yang diantrekan.
+     * <p>
+     * Tidak bisa memakai {@link #mScheduledFlush}: method itu dipanggil dari
+     * dalam task flush yang sedang berjalan, sehingga pemeriksaan
+     * {@code isDone()} selalu menolak dan percobaan ulang tidak pernah terjadi.
+     */
+    private final java.util.concurrent.atomic.AtomicBoolean mRetryScheduled =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    private static final class Registration
     {
+        final String version;
+        int attempts;
+
+        Registration(String version)
+        {
+            this.version = version;
+        }
+    }
+
+    /**
+     * Mendaftarkan paket ini sebagai aplikasi yang benar-benar di-hook modul.
+     * <p>
+     * Inilah sumber daftar "aplikasi target" di UI. Konfigurasi scope LSPosed
+     * hanya bisa dibaca root, tetapi paket tempat modul berjalan dapat
+     * melaporkan dirinya sendiri. Pendaftaran dilakukan sebelum hook dipasang
+     * supaya aplikasi tetap muncul walaupun tidak ada SDK iklan yang dikenali.
+     * <p>
+     * Ditulis lewat executor yang sama dengan statistik agar urutan
+     * (daftar aktif lalu angka) tetap terjaga.
+     */
+    public void registerActive(String pkgName, String version)
+    {
+        if (pkgName == null || pkgName.isEmpty() || !mRegistered.add(pkgName))
+        {
+            return;
+        }
+        mExecutor.execute(() -> writeActiveOrRetry(pkgName, version));
+    }
+
+    /**
+     * Menulis pendaftaran; bila gagal, disimpan untuk dicoba lagi.
+     * <p>
+     * Provider bisa belum bisa dihubungi saat {@code Application.onCreate}
+     * (proses modul belum hidup, atau ContentResolver belum siap). Versi
+     * sebelumnya menyerah pada kegagalan pertama, sehingga aplikasi itu tidak
+     * pernah muncul di daftar UI walaupun pemblokiran berjalan normal.
+     */
+    private void writeActiveOrRetry(final String pkgName, final String version)
+    {
+        if (writeActive(pkgName, version))
+        {
+            mRetry.remove(pkgName);
+            return;
+        }
+        Registration pending = mRetry.get(pkgName);
+        if (pending == null)
+        {
+            pending = new Registration(version);
+            Registration previous = mRetry.putIfAbsent(pkgName, pending);
+            if (previous != null)
+            {
+                pending = previous;
+            }
+        }
+        pending.attempts++;
+        if (pending.attempts >= MAX_REGISTER_ATTEMPTS)
+        {
+            mRetry.remove(pkgName);
+            Util.warn("gagal mendaftarkan " + pkgName + " sebagai aplikasi aktif setelah "
+                    + pending.attempts + " percobaan; aplikasi tetap diblokir tetapi tidak "
+                    + "muncul di daftar");
+            return;
+        }
+        scheduleRetry();
+    }
+
+    /** Menjadwalkan satu percobaan ulang pendaftaran bila belum ada yang diantrekan. */
+    private void scheduleRetry()
+    {
+        if (!mRetryScheduled.compareAndSet(false, true))
+        {
+            return;
+        }
+        try
+        {
+            mExecutor.execute(() -> {
+                try
+                {
+                    TimeUnit.MILLISECONDS.sleep(REGISTER_RETRY_DELAY_MS);
+                }
+                catch (InterruptedException ignored)
+                {
+                    Thread.currentThread().interrupt();
+                }
+                // Dilepas sebelum flush: flush() sendiri yang menjadwalkan
+                // percobaan berikutnya bila masih ada yang gagal, sehingga
+                // tidak ada dua percobaan yang menumpuk.
+                mRetryScheduled.set(false);
+                flush();
+            });
+        }
+        catch (Throwable t)
+        {
+            mRetryScheduled.set(false);
+        }
+    }
+
+    /**
+     * Mencoba ulang pendaftaran yang tertunda.
+     *
+     * @return true bila masih ada yang perlu dicoba lagi
+     */
+    private boolean retryRegistrations()
+    {
+        if (mRetry.isEmpty())
+        {
+            return false;
+        }
+        boolean stillFailing = false;
+        for (String pkgName : new ArrayList<>(mRetry.keySet()))
+        {
+            Registration pending = mRetry.get(pkgName);
+            if (pending == null)
+            {
+                continue;
+            }
+            if (writeActive(pkgName, pending.version))
+            {
+                mRetry.remove(pkgName);
+                continue;
+            }
+            pending.attempts++;
+            if (pending.attempts >= MAX_REGISTER_ATTEMPTS)
+            {
+                mRetry.remove(pkgName);
+                Util.warn("berhenti mencoba mendaftarkan " + pkgName + " sebagai aplikasi aktif");
+            }
+            else
+            {
+                stillFailing = true;
+            }
+        }
+        return stillFailing;
+    }
+
+    /** @return true bila pendaftaran tersimpan di provider. */
+    private boolean writeActive(final String pkgName, final String version)
+    {
+        Context context = Util.getCurrentApplication();
+        if (context == null)
+        {
+            return false;
+        }
+        ContentValues values = new ContentValues();
+        values.put(Common.KEY_PKG_NAME, pkgName);
+        values.put(Common.KEY_APP_VERSION, version);
+        try
+        {
+            context.getContentResolver().update(Uri.parse(Common.URI_ACTIVE), values, null, null);
+            return true;
+        }
+        catch (Throwable t)
+        {
+            Util.log(pkgName, "gagal mendaftarkan aplikasi aktif: " + t);
+            return false;
+        }
+    }
+
+    public void recordNetwork(String pkgName, String network)    {
         if (pkgName == null || network == null || network.isEmpty())
         {
             return;
@@ -174,7 +376,19 @@ public final class StatsReporter
         {
             evictIdleEntry();
         }
-        return mPending.computeIfAbsent(pkgName, key -> new Pending());
+        // computeIfAbsent juga API 24+; pakai pola cek-lalu-put yang setara
+        // di bawah ini.
+        Pending created = mPending.get(pkgName);
+        if (created == null)
+        {
+            created = new Pending();
+            Pending previous = mPending.putIfAbsent(pkgName, created);
+            if (previous != null)
+            {
+                created = previous;
+            }
+        }
+        return created;
     }
 
     /** Melepas satu entri tanpa delta tertunda; mengembalikan false bila tidak ada. */
@@ -237,8 +451,16 @@ public final class StatsReporter
 
     private void flush()
     {
+        // Pendaftaran aplikasi aktif dicoba ulang lebih dulu: bila provider
+        // akhirnya bisa dihubungi, barisnya langsung terlihat di UI.
+        boolean retryNeeded = retryRegistrations();
+
         if (mPending.isEmpty())
         {
+            if (retryNeeded)
+            {
+                scheduleRetry();
+            }
             return;
         }
 
@@ -258,6 +480,10 @@ public final class StatsReporter
                 }
             }
             mPending.clear();
+            if (retryNeeded)
+            {
+                scheduleRetry();
+            }
             return;
         }
 

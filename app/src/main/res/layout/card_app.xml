@@ -28,7 +28,7 @@
                 android:id="@+id/img_app_icon"
                 android:layout_width="44dp"
                 android:layout_height="44dp"
-                android:contentDescription="Card app icon"
+                android:contentDescription="@string/app_icon_desc"
                 tools:src="@drawable/icon"/>
 
         <LinearLayout
@@ -54,16 +54,20 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:textColor="?colorPrimary"
                     android:textSize="13sp"
-                    tools:text="Blocked 12 ads"/>
+                    tools:text="12 iklan diblokir"/>
         </LinearLayout>
 
-        <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switch_enable"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"/>
+        <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginStart="8dp"
+                android:alpha="0.6"
+                android:contentDescription="@string/detail_open_desc"
+                android:src="@drawable/ic_info"/>
 
     </LinearLayout>
 

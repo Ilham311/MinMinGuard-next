@@ -57,6 +57,18 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Read module version
+        id: version
+        run: |
+          set -eu
+          VERSION=$(sed -n 's/.*versionName[[:space:]]*"\([^"]*\)".*/\1/p' app/build.gradle | head -1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not read versionName from app/build.gradle"
+            exit 1
+          fi
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "APK name: MinMinGuard-next-$VERSION-debug.apk"
+
       - name: Build debug
         run: ./gradlew --no-daemon --stacktrace assembleDebug
 
@@ -64,13 +76,13 @@ jobs:
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/debug/app-debug.apk \
-             "dist/MinMinGuard-next-3.1.0-debug.apk"
+             "dist/MinMinGuard-next-${{ steps.version.outputs.name }}-debug.apk"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: MinMinGuard-next-debug
-          path: dist/MinMinGuard-next-3.1.0-debug.apk
+          path: dist/MinMinGuard-next-${{ steps.version.outputs.name }}-debug.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -131,6 +143,18 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Read module version
+        id: version
+        run: |
+          set -eu
+          VERSION=$(sed -n 's/.*versionName[[:space:]]*"\([^"]*\)".*/\1/p' app/build.gradle | head -1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not read versionName from app/build.gradle"
+            exit 1
+          fi
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "APK name: MinMinGuard-next-$VERSION-release.apk"
+
       - name: Build release
         run: ./gradlew --no-daemon --stacktrace assembleRelease
 
@@ -146,13 +170,13 @@ jobs:
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk \
-             "dist/MinMinGuard-next-3.1.0-release.apk"
+             "dist/MinMinGuard-next-${{ steps.version.outputs.name }}-release.apk"
 
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: MinMinGuard-next-release
-          path: dist/MinMinGuard-next-3.1.0-release.apk
+          path: dist/MinMinGuard-next-${{ steps.version.outputs.name }}-release.apk
           if-no-files-found: error
           retention-days: 30
 

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import tw.fatminmin.xposed.minminguard.next.Common;
+import tw.fatminmin.xposed.minminguard.next.ui.models.ActiveApp;
 import tw.fatminmin.xposed.minminguard.next.ui.models.AppStats;
 
 /**
@@ -81,9 +82,76 @@ public final class StatsRepository
         return result;
     }
 
-    /** Semua jaringan beserta total hit-nya, diurutkan menurun. */
-    public static List<Map.Entry<String, Integer>> loadNetworkTotals(Context context)
+    /**
+     * Aplikasi yang benar-benar di-hook modul, terbaru lebih dulu.
+     * <p>
+     * Ini pengganti daftar "semua aplikasi terpasang" pada versi lama: yang
+     * ditampilkan hanya aplikasi yang memang ada di scope LSPosed, karena hanya
+     * aplikasi itu yang melaporkan dirinya lewat {@code URI_ACTIVE}.
+     */
+    public static List<ActiveApp> loadActiveApps(Context context)
     {
+        List<ActiveApp> result = new ArrayList<>();
+        if (context == null)
+        {
+            return result;
+        }
+
+        Cursor cursor = null;
+        try
+        {
+            cursor = context.getContentResolver().query(Uri.parse(Common.URI_ACTIVE),
+                    new String[]{Common.COL_PKG_NAME, Common.COL_APP_VERSION, Common.COL_FIRST_SEEN,
+                            Common.COL_LAST_SEEN},
+                    null, null, null);
+            if (cursor == null)
+            {
+                return result;
+            }
+            while (cursor.moveToNext())
+            {
+                String pkgName = cursor.getString(0);
+                if (pkgName == null || pkgName.isEmpty())
+                {
+                    continue;
+                }
+                result.add(new ActiveApp(pkgName,
+                        cursor.isNull(1) ? null : cursor.getString(1),
+                        cursor.isNull(2) ? 0L : cursor.getLong(2),
+                        cursor.isNull(3) ? 0L : cursor.getLong(3)));
+            }
+        }
+        catch (Throwable ignored)
+        {
+        }
+        finally
+        {
+            if (cursor != null)
+            {
+                cursor.close();
+            }
+        }
+        return result;
+    }
+
+    /** Lupakan daftar aplikasi aktif (dipakai setelah scope LSPosed diubah). */
+    public static void clearActiveApps(Context context)
+    {
+        if (context == null)
+        {
+            return;
+        }
+        try
+        {
+            context.getContentResolver().delete(Uri.parse(Common.URI_ACTIVE), null, null);
+        }
+        catch (Throwable ignored)
+        {
+        }
+    }
+
+    /** Semua jaringan beserta total hit-nya, diurutkan menurun. */
+    public static List<Map.Entry<String, Integer>> loadNetworkTotals(Context context)    {
         Map<String, Integer> totals = new HashMap<>();
         if (context == null)
         {

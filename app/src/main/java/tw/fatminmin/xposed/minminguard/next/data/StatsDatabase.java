@@ -15,22 +15,27 @@ import tw.fatminmin.xposed.minminguard.next.Common;
  * yang mempertahankan data.
  * <p>
  * Skema 2 menambahkan kolom {@code LAST_SEEN} pada {@code APP_DATA} dan tabel
- * {@code NETWORK_STAT} untuk hitungan per-jaringan iklan. Semua penulisan harus
+ * {@code NETWORK_STAT} untuk hitungan per-jaringan iklan. Skema 3 menambahkan
+ * tabel {@code ACTIVE_APP}: daftar aplikasi yang benar-benar di-hook modul,
+ * yang menjadi sumber daftar "aplikasi target" di UI. Semua penulisan harus
  * melalui {@link tw.fatminmin.xposed.minminguard.next.MinMinProvider}; UI hanya
  * membaca lewat provider agar tidak ada dua koneksi yang saling mengunci.
  */
 public final class StatsDatabase extends SQLiteOpenHelper
 {
     public static final String DB_NAME = "mmg";
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
 
     public static final String TABLE_APP = "APP_DATA";
     public static final String TABLE_NETWORK = "NETWORK_STAT";
+    public static final String TABLE_ACTIVE = "ACTIVE_APP";
 
     public static final String COL_PKG = Common.COL_PKG_NAME;
     public static final String COL_NETWORKS = Common.COL_AD_NETWORKS;
     public static final String COL_BLOCKS = Common.COL_BLOCK_NUM;
     public static final String COL_LAST_SEEN = Common.COL_LAST_SEEN;
+    public static final String COL_FIRST_SEEN = Common.COL_FIRST_SEEN;
+    public static final String COL_APP_VERSION = Common.COL_APP_VERSION;
     public static final String COL_NETWORK = Common.COL_NETWORK;
     public static final String COL_HITS = Common.COL_NETWORK_HIT;
 
@@ -91,6 +96,23 @@ public final class StatsDatabase extends SQLiteOpenHelper
 
         db.execSQL("CREATE INDEX IF NOT EXISTS \"IDX_NETWORK_PKG\" ON \""
                 + TABLE_NETWORK + "\" (\"" + COL_PKG + "\")");
+
+        createActiveTable(db);
+    }
+
+    /**
+     * Tabel aplikasi yang di-hook modul.
+     * <p>
+     * {@code FIRST_SEEN} dipertahankan saat baris diperbarui supaya UI bisa
+     * membedakan aplikasi yang baru terpasang dari yang sudah lama dipakai.
+     */
+    private void createActiveTable(SQLiteDatabase db)
+    {
+        db.execSQL("CREATE TABLE IF NOT EXISTS \"" + TABLE_ACTIVE + "\" ("
+                + "\"" + COL_PKG + "\" TEXT PRIMARY KEY NOT NULL,"
+                + "\"" + COL_APP_VERSION + "\" TEXT,"
+                + "\"" + COL_FIRST_SEEN + "\" INTEGER DEFAULT 0,"
+                + "\"" + COL_LAST_SEEN + "\" INTEGER DEFAULT 0)");
     }
 
     @Override
@@ -99,6 +121,11 @@ public final class StatsDatabase extends SQLiteOpenHelper
         if (oldVersion < 2)
         {
             migrateToV2(db);
+        }
+        if (oldVersion < 3)
+        {
+            // Migrasi ini hanya membuat tabel baru; data lama tidak disentuh.
+            createActiveTable(db);
         }
     }
 

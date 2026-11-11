@@ -16,18 +16,22 @@ public class Common
     public final static String AUTHORITY = PACKAGE_NAME;
     public final static String URI_STATS = "content://" + AUTHORITY + "/stats";
     public final static String URI_NETWORKS = "content://" + AUTHORITY + "/networks";
+    /**
+     * Daftar aplikasi yang benar-benar di-hook modul. Inilah satu-satunya
+     * sumber "aplikasi target" untuk UI: berkas konfigurasi LSPosed hanya bisa
+     * dibaca root, sedangkan paket yang di-hook bisa dicatat modul sendiri.
+     */
+    public final static String URI_ACTIVE = "content://" + AUTHORITY + "/active";
 
     public final static String MOD_PREFS = "ModSettings";
     public final static String UI_PREFS = "UI_PREF";
 
     // UI Pref
     public final static String KEY_FIRST_TIME = "first_time_2_0_alpha_7";
-    public final static String KEY_SHOW_SYSTEM_APPS = "show_system_apps";
     public final static String KEY_SHOW_LAUNCHER_ICON = "show_launcher_icon";
     public final static String KEY_ENABLE_CRASH_REPORT = "enable_crash_report";
     public final static String KEY_SORT = "sort";
     public final static String KEY_THEME = "theme";
-
     public final static String VALUE_SORT_NAME = "name";
     public final static String VALUE_SORT_PACKAGE = "package";
     public final static String VALUE_SORT_BLOCKED = "blocked";
@@ -37,16 +41,9 @@ public class Common
     public final static String VALUE_THEME_DARK = "dark";
 
     // Xposed Mod Pref
-    public final static String KEY_MODE = "mode";
-    public final static String VALUE_MODE_AUTO = "auto";
-    public final static String VALUE_MODE_BLACKLIST = "blacklist";
-    public final static String VALUE_MODE_WHITELIST = "whitelist";
     public final static String KEY_USER_BLOCK_PREFIXES = "user_block_prefixes";
     public final static String KEY_HEURISTIC = "heuristic_blocking";
     public final static String KEY_VERBOSE_LOG = "verbose_log";
-
-    // Fragment Name
-    public final static String FRG_MAIN = "main_fragment";
 
     // Kontrak MinMinProvider
     public final static String KEY_PKG_NAME = "PKG_NAME";
@@ -60,28 +57,26 @@ public class Common
      * bukan berarti ada iklan yang benar-benar diblokir.
      */
     public final static String KEY_NETWORK_DETECT = "NETWORK_DETECT";
+    /** Nama versi aplikasi yang di-hook, dikirim bersama pendaftaran paket aktif. */
+    public final static String KEY_APP_VERSION = "APP_VERSION";
 
-    // Nama kolom cursor yang dikembalikan URI_STATS / URI_NETWORKS
+    // Nama kolom cursor yang dikembalikan URI_STATS / URI_NETWORKS / URI_ACTIVE
     public final static String COL_PKG_NAME = "PKG_NAME";
     public final static String COL_AD_NETWORKS = "AD_NETWORKS";
     public final static String COL_BLOCK_NUM = "BLOCK_NUM";
     public final static String COL_LAST_SEEN = "LAST_SEEN";
+    public final static String COL_FIRST_SEEN = "FIRST_SEEN";
+    public final static String COL_APP_VERSION = "APP_VERSION";
     public final static String COL_NETWORK = "NETWORK";
     public final static String COL_NETWORK_HIT = "HIT_NUM";
 
     /** Akhiran kunci preferensi per aplikasi. */
     public final static String SUFFIX_URL = "_url";
     public final static String SUFFIX_DNS = "_dns";
-    public final static String SUFFIX_WHITELIST = "_whitelist";
 
     private Common() throws InstantiationException
     {
         throw new InstantiationException("This class is not for instantiation");
-    }
-
-    public static String getWhiteListKey(String pkgName)
-    {
-        return pkgName + SUFFIX_WHITELIST;
     }
 
     public static String getUrlFilterKey(String pkgName)

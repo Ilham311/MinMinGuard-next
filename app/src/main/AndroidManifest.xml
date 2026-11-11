@@ -72,8 +72,11 @@
         <meta-data
                 android:name="xposedsharedprefs"
                 android:value="true"/>
+        <!-- Scope yang disarankan. Modul tidak lagi menyuntikkan izin ke proses
+             "android", jadi paket sistem itu tidak perlu (dan tidak boleh)
+             dimasukkan ke scope. -->
         <meta-data
                 android:name="xposedscope"
-                android:value="android\ntw.fatminmin.xposed.minminguard.next"/>
+                android:value="tw.fatminmin.xposed.minminguard.next"/>
     </application>
 </manifest>

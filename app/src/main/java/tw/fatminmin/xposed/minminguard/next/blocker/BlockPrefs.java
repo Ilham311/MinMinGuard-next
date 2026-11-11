@@ -35,7 +35,6 @@ public final class BlockPrefs
     private volatile long mLastReload;
     private volatile boolean mReadable;
 
-    private volatile String mMode;
     private volatile List<String> mUserPrefixes;
     private volatile boolean mHeuristic;
     private volatile boolean mVerbose;
@@ -136,8 +135,6 @@ public final class BlockPrefs
 
                 mPrefs.reload();
 
-                mMode = mPrefs.getString(Common.KEY_MODE, Common.VALUE_MODE_BLACKLIST);
-
                 String rawPrefixes = mPrefs.getString(Common.KEY_USER_BLOCK_PREFIXES, "");
                 List<String> prefixes = new ArrayList<>();
                 if (rawPrefixes != null)
@@ -182,35 +179,18 @@ public final class BlockPrefs
     }
 
     /**
-     * @return {@code true} bila modul diaktifkan untuk paket ini menurut mode
-     * saat ini.
+     * On/off satu-satunya sekarang adalah keanggotaan scope LSPosed: bila
+     * modul dijalankan di dalam proses sebuah paket, paket itu memang dipilih
+     * pengguna. Karena itu method ini selalu {@code true}, dan hanya tersisa
+     * sebagai titik tunggal bila nanti diperlukan pengecualian.
+     * <p>
+     * Sebelumnya ada tiga mode (auto/blacklist/whitelist) beserta sakelar per
+     * aplikasi; UI-nya membingungkan dan mudah membuat modul tampak "tidak
+     * berfungsi" padahal aplikasinya hanya belum dicentang.
      */
     public boolean isEnabledFor(String pkgName)
     {
-        reload();
-
-        if (mPrefs == null || !mReadable)
-        {
-            // Tanpa preferensi yang bisa dibaca, mode default (blacklist)
-            // berarti tidak ada aplikasi yang diblokir.
-            return false;
-        }
-
-        String mode = mMode;
-        if (mode == null)
-        {
-            mode = Common.VALUE_MODE_BLACKLIST;
-        }
-
-        if (Common.VALUE_MODE_AUTO.equals(mode))
-        {
-            return true;
-        }
-        if (Common.VALUE_MODE_BLACKLIST.equals(mode))
-        {
-            return getBoolean(pkgName, false);
-        }
-        return !getBoolean(Common.getWhiteListKey(pkgName), false);
+        return pkgName != null && pkgName.length() > 0;
     }
 
     public boolean isUrlFilterEnabled(String pkgName)

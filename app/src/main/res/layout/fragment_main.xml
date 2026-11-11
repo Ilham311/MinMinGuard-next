@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-                xmlns:app="http://schemas.android.com/apk/res-auto"
-                xmlns:tools="http://schemas.android.com/tools"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                tools:context="tw.fatminmin.xposed.minminguard.next.ui.fragments.MainFragment">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              xmlns:tools="http://schemas.android.com/tools"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical"
+              tools:context="tw.fatminmin.xposed.minminguard.next.ui.fragments.MainFragment">
 
     <TextView
             android:id="@+id/txt_xposed_enable"
@@ -22,7 +23,6 @@
             android:id="@+id/txt_runtime"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_below="@+id/txt_xposed_enable"
             android:background="?colorSurfaceContainerHighest"
             android:paddingLeft="12dp"
             android:paddingTop="6dp"
@@ -33,154 +33,111 @@
             tools:text="Framework: LSPosed / Vector (API 93) | Root: Magisk"/>
 
     <com.google.android.material.card.MaterialCardView
-            android:id="@+id/mode_info_card"
+            android:id="@+id/summary_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_below="@+id/txt_runtime"
             android:layout_marginLeft="12dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:layout_marginRight="12dp"
-            app:cardBackgroundColor="?colorSurfaceContainerLow"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="0dp"
-            app:strokeColor="?colorOutlineVariant"
-            app:strokeWidth="1dp">
+            app:cardBackgroundColor="?colorPrimaryContainer"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp">
 
         <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:padding="12dp">
+                android:padding="16dp">
 
-            <ImageView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:contentDescription="@string/mode_info_title"
-                    android:src="@drawable/ic_info"/>
-
-            <TextView
-                    android:id="@+id/txt_mode_info"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="12dp"
-                    android:textColor="?colorOnSurfaceVariant"
-                    android:textSize="13sp"
-                    tools:text="@string/mode_info_auto"/>
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-    <com.google.android.material.card.MaterialCardView
-            android:id="@+id/batch_bar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_below="@+id/mode_info_card"
-            android:layout_marginLeft="12dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginRight="12dp"
-            app:cardBackgroundColor="?colorSurfaceContainerHigh"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="1dp">
-
-        <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:padding="6dp">
-
-            <TextView
-                    android:id="@+id/txt_batch_count"
+            <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="?colorOnSurface"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
-                    tools:text="3 selected"/>
+                    android:orientation="vertical">
 
-            <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_batch_select_all"
-                    style="?materialButtonOutlinedStyle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:minWidth="0dp"
-                    android:paddingLeft="10dp"
-                    android:paddingRight="10dp"
-                    android:text="@string/batch_select_all"
-                    android:textSize="12sp"/>
+                <TextView
+                        android:id="@+id/txt_total_blocked"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="?colorOnPrimaryContainer"
+                        android:textSize="34sp"
+                        android:textStyle="bold"
+                        tools:text="1.284"/>
 
-            <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_batch_enable"
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:layout_marginStart="6dp"
-                    android:minWidth="0dp"
-                    android:paddingLeft="14dp"
-                    android:paddingRight="14dp"
-                    android:text="@string/batch_enable"
-                    android:textSize="12sp"/>
+                <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/summary_total_blocked"
+                        android:textColor="?colorOnPrimaryContainer"
+                        android:textSize="13sp"/>
+            </LinearLayout>
 
-            <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_batch_disable"
-                    style="?materialButtonOutlinedStyle"
+            <LinearLayout
                     android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:layout_marginStart="6dp"
-                    android:minWidth="0dp"
-                    android:paddingLeft="10dp"
-                    android:paddingRight="10dp"
-                    android:text="@string/batch_disable"
-                    android:textSize="12sp"/>
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:orientation="vertical">
 
-            <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_batch_cancel"
-                    style="?materialButtonOutlinedStyle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:layout_marginStart="6dp"
-                    android:minWidth="0dp"
-                    android:paddingLeft="10dp"
-                    android:paddingRight="10dp"
-                    android:text="@string/batch_close"
-                    android:textSize="12sp"/>
+                <TextView
+                        android:id="@+id/txt_active_count"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="end"
+                        android:textColor="?colorOnPrimaryContainer"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        tools:text="3"/>
+
+                <TextView
+                        android:id="@+id/txt_active_count_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="end"
+                        android:text="@string/summary_active_apps"
+                        android:textColor="?colorOnPrimaryContainer"
+                        android:textSize="13sp"/>
+            </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recycler_view"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_above="@+id/btn_mode"
-            android:layout_below="@+id/batch_bar"
-            android:paddingTop="6dp"
-            android:scrollbars="vertical"/>
-
     <TextView
-            android:id="@+id/txt_empty"
+            android:id="@+id/txt_list_header"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_above="@+id/btn_mode"
-            android:layout_below="@+id/batch_bar"
-            android:gravity="center"
-            android:padding="24dp"
-            android:text="@string/msg_empty_list"
+            android:layout_marginLeft="16dp"
+            android:layout_marginTop="14dp"
+            android:layout_marginRight="16dp"
+            android:layout_marginBottom="2dp"
+            android:text="@string/summary_header_active"
             android:textColor="?colorOnSurfaceVariant"
-            android:textSize="14sp"
-            android:visibility="gone"
-            tools:visibility="visible"/>
+            android:textSize="13sp"
+            android:textStyle="bold"/>
 
-    <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_mode"
+    <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true"
-            android:layout_margin="16dp"
-            android:text="@string/msg_mode_apply"
-            android:textSize="15sp"
-            app:cornerRadius="28dp"/>
+            android:layout_height="0dp"
+            android:layout_weight="1">
 
-</RelativeLayout>
+        <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:paddingBottom="8dp"
+                android:scrollbars="vertical"/>
+
+        <TextView
+                android:id="@+id/txt_empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:padding="24dp"
+                android:text="@string/msg_empty_scope"
+                android:textColor="?colorOnSurfaceVariant"
+                android:textSize="14sp"
+                android:visibility="gone"
+                tools:visibility="visible"/>
+    </FrameLayout>
+
+</LinearLayout>

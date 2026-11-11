@@ -74,16 +74,41 @@ public final class Util
         }
     }
 
+    /**
+     * Cadangan bila {@link AndroidAppHelper#currentApplication()} belum/tidak
+     * mengembalikan apa pun.
+     * <p>
+     * Dulu seluruh pemblokiran bergantung pada helper itu. Bila nilainya null
+     * saat {@code Application.onCreate} (terjadi pada sebagian ROM dan pada
+     * proses yang dibuat lewat {@code ActivityThread} kustom), modul keluar
+     * lebih awal dan aplikasi itu tidak pernah diblokir sama sekali — tanpa
+     * pesan apa pun. Pemanggil sekarang bisa menyerahkan objek Application
+     * yang sedang dibuat sebagai cadangan.
+     */
+    private static volatile Application sFallbackApplication;
+
+    public static void setFallbackApplication(Application application)
+    {
+        if (application != null)
+        {
+            sFallbackApplication = application;
+        }
+    }
+
     public static Application getCurrentApplication()
     {
         try
         {
-            return AndroidAppHelper.currentApplication();
+            Application application = AndroidAppHelper.currentApplication();
+            if (application != null)
+            {
+                return application;
+            }
         }
         catch (Throwable ignored)
         {
-            return null;
         }
+        return sFallbackApplication;
     }
 
     /**

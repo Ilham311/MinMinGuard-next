@@ -9,6 +9,7 @@ import android.widget.TextView;
 import androidx.fragment.app.DialogFragment;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -68,7 +69,8 @@ public class StatsDialogFragment extends DialogFragment
         }
         else
         {
-            apps.sort((l, r) -> Integer.compare(r.getBlockNum(), l.getBlockNum()));
+            // List.sort() butuh API 24; modul ini mendukung API 21.
+            Collections.sort(apps, (l, r) -> Integer.compare(r.getBlockNum(), l.getBlockNum()));
             StringBuilder sb = new StringBuilder();
             int shown = 0;
             for (AppStats item : apps)

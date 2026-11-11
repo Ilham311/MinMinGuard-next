@@ -1,12 +1,10 @@
 package tw.fatminmin.xposed.minminguard.next;
 
 import android.content.Context;
-import android.os.Build;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -105,7 +103,6 @@ import tw.fatminmin.xposed.minminguard.next.blocker.custom_mod._2chMate;
 public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXposedHookInitPackageResources
 {
     private static final String MY_PACKAGE_NAME = Main.class.getPackage().getName();
-    private static final String QUERY_ALL_PACKAGES = "android.permission.QUERY_ALL_PACKAGES";
 
     private static String MODULE_PATH;
     public static Integer xposedVersionCode;
@@ -220,32 +217,62 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
         }
 
         /*
-         * Sejak Android 11 aplikasi target tidak bisa melihat ContentProvider
-         * modul (content://tw.fatminmin.xposed.minminguard.next) sehingga
-         * statistik tidak bisa dilaporkan. Solusi resmi adalah menambahkan
-         * <queries> atau izin QUERY_ALL_PACKAGES di manifest aplikasi target.
-         * Karena aplikasi target tidak bisa diubah, izin itu disuntikkan saat
-         * framework memulihkan status izin paket.
-         *
-         * Syarat: proses "android" harus ada dalam scope LSPosed dan perangkat
-         * perlu reboot setelah mengaktifkan sebuah aplikasi.
+         * Penyuntikan izin QUERY_ALL_PACKAGES (versi lama) dihapus.
+         * <p>
+         * Izin itu disuntikkan ke setiap paket yang dianggap "diaktifkan" saat
+         * framework memulihkan status izin. Selama gerbang mode masih ada,
+         * cakupannya sempit; kini gerbang itu hilang (scope = on/off), sehingga
+         * hook tersebut akan memberi QUERY_ALL_PACKAGES ke hampir semua paket
+         * di perangkat — izin yang jauh lebih luas daripada kebutuhan modul.
+         * Audit perangkat juga menunjukkan statistik tetap sampai ke provider
+         * tanpa izin itu, jadi manfaatnya tidak sebanding risikonya.
          */
-        if (Build.VERSION.SDK_INT > 29 && lpparam.packageName.equals("android"))
+
+        /*
+         * Titik masuk utama: ActivityThread selalu memanggil
+         * Instrumentation.callApplicationOnCreate(app) tepat sekali per proses,
+         * apa pun kelas Application yang dipakai. Hook pada
+         * Application.onCreate saja tidak cukup: aplikasi yang meng-override
+         * onCreate tanpa memanggil super.onCreate() tidak pernah memicu hook
+         * itu, sehingga aplikasi tersebut sama sekali tidak diblokir — tanpa
+         * pesan apa pun. Parameter di sini sudah berupa objek Application
+         * yang siap dipakai.
+         */
+        try
         {
-            // Android 14 memindahkan kelas ini; coba kedua nama.
-            hookRestorePermissionState(lpparam, "com.android.server.pm.permission.PermissionManagerServiceImpl");
-            hookRestorePermissionState(lpparam, "com.android.server.pm.permission.PermissionManagerService");
+            XposedHelpers.findAndHookMethod("android.app.Instrumentation", lpparam.classLoader,
+                    "callApplicationOnCreate", android.app.Application.class, new XC_MethodHook()
+                    {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param)
+                        {
+                            if (param.args.length > 0 && param.args[0] instanceof android.app.Application)
+                            {
+                                Util.setFallbackApplication((android.app.Application) param.args[0]);
+                            }
+                            onApplicationCreated(lpparam);
+                        }
+                    });
+        }
+        catch (Throwable t)
+        {
+            Util.warn("hook Instrumentation#callApplicationOnCreate gagal: " + t);
         }
 
         /*
-         * Tunggu sampai Application.onCreate supaya AndroidAppHelper
-         * mengembalikan Context yang valid (dibutuhkan ContentResolver).
+         * Cadangan: sebagian ROM/OEM membuat Application lewat jalur lain.
+         * Pemasangan ganda tidak terjadi karena onApplicationCreated()
+         * memakai kunci proses yang sama.
          */
         XposedHelpers.findAndHookMethod("android.app.Application", lpparam.classLoader, "onCreate", new XC_MethodHook()
         {
             @Override
             protected void afterHookedMethod(MethodHookParam param)
             {
+                if (param.thisObject instanceof android.app.Application)
+                {
+                    Util.setFallbackApplication((android.app.Application) param.thisObject);
+                }
                 onApplicationCreated(lpparam);
             }
         });
@@ -260,10 +287,21 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
             return;
         }
 
+        // Proses sistem hanya dipakai untuk hook izin (lihat handleLoadPackage).
+        // Jangan memasang pemblokir di sini: hook ViewGroup/LayoutInflater/
+        // Activity di system_server akan merusak seluruh sistem.
+        if (packageName.equals("android"))
+        {
+            return;
+        }
+
         if (Util.getCurrentApplication() == null)
         {
-            Util.log(packageName, "Context belum tersedia, lewati");
-            return;
+            // Tanpa Context, statistik tidak bisa dilaporkan, tetapi hook tetap
+            // dipasang: lebih baik iklan hilang tanpa statistik daripada iklan
+            // tetap tampil. Dulu modul berhenti di sini dan tidak memblokir apa
+            // pun tanpa terlihat.
+            Util.warn("Context belum tersedia untuk " + packageName + ", hook tetap dipasang");
         }
 
         // Satu proses hanya dipasangi hook sekali. Sebagian aplikasi memanggil
@@ -277,11 +315,13 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
             return;
         }
 
+        // Gerbang on/off sekarang hanya keanggotaan scope LSPosed: karena kode
+        // ini berjalan di dalam proses paket target, paket itu memang dipilih
+        // pengguna. Daftarkan dirinya ke UI supaya daftar "aplikasi target"
+        // tidak perlu menebak isi konfigurasi LSPosed (yang butuh root).
+        StatsReporter.get().registerActive(packageName, appVersionOf(packageName));
+
         BlockPrefs prefs = BlockPrefs.get();
-        if (!prefs.isEnabledFor(packageName))
-        {
-            return;
-        }
 
         Util.log(packageName, "diaktifkan untuk MinMinGuard");
 
@@ -334,6 +374,26 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
         Viafree.handleLoadPackage(packageName, lpparam);
     }
 
+    /** Versi aplikasi target, ditampilkan di daftar supaya mudah dikenali. */
+    private static String appVersionOf(String packageName)
+    {
+        android.app.Application application = Util.getCurrentApplication();
+        if (application == null)
+        {
+            return null;
+        }
+        try
+        {
+            android.content.pm.PackageInfo info = application.getPackageManager()
+                    .getPackageInfo(packageName, 0);
+            return info == null ? null : info.versionName;
+        }
+        catch (Throwable ignored)
+        {
+            return null;
+        }
+    }
+
     /**
      * Patch berbasis resource (PeriodCalendar). Hook ini dipanggil framework
      * sebelum proses aplikasi berjalan, jadi tidak bisa dilakukan dari
@@ -349,92 +409,6 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
         catch (Throwable t)
         {
             Util.warn("gagal mem-patch resource " + resparam.packageName + ": " + t);
-        }
-    }
-
-    private static void hookRestorePermissionState(LoadPackageParam lpparam, String className)
-    {
-        try
-        {
-            XposedBridge.hookAllMethods(XposedHelpers.findClass(className, lpparam.classLoader), "restorePermissionState", new XC_MethodHook()
-            {
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param) throws Throwable
-                {
-                    Object pkg = param.args[0];
-                    if (pkg == null)
-                    {
-                        return;
-                    }
-
-                    String pkgName = null;
-                    try
-                    {
-                        pkgName = (String) XposedHelpers.callMethod(pkg, "getPackageName");
-                    }
-                    catch (Throwable ignored)
-                    {
-                    }
-                    if (pkgName == null)
-                    {
-                        try
-                        {
-                            pkgName = (String) XposedHelpers.getObjectField(pkg, "packageName");
-                        }
-                        catch (Throwable ignored)
-                        {
-                        }
-                    }
-
-                    if (pkgName == null || !BlockPrefs.get().isEnabledFor(pkgName))
-                    {
-                        return;
-                    }
-
-                    Object permissions = null;
-                    try
-                    {
-                        permissions = XposedHelpers.getObjectField(pkg, "requestedPermissions");
-                    }
-                    catch (Throwable ignored)
-                    {
-                    }
-                    if (permissions == null)
-                    {
-                        try
-                        {
-                            permissions = XposedHelpers.callMethod(pkg, "getRequestedPermissions");
-                        }
-                        catch (Throwable ignored)
-                        {
-                        }
-                    }
-
-                    if (!(permissions instanceof Collection))
-                    {
-                        return;
-                    }
-
-                    Collection collection = (Collection) permissions;
-                    if (collection.contains(QUERY_ALL_PACKAGES))
-                    {
-                        return;
-                    }
-                    try
-                    {
-                        collection.add(QUERY_ALL_PACKAGES);
-                        Util.warn("menambahkan " + QUERY_ALL_PACKAGES + " ke " + pkgName);
-                    }
-                    catch (ClassCastException | UnsupportedOperationException e)
-                    {
-                        Util.warn("tidak bisa menambahkan " + QUERY_ALL_PACKAGES + " ke " + pkgName + ": " + e);
-                    }
-                }
-            });
-        }
-        catch (Throwable t)
-        {
-            Util.log(MY_PACKAGE_NAME, className + " -> " + t);
         }
     }
 }

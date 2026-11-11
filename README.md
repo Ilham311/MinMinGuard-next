@@ -32,7 +32,7 @@ The project has been modernised (AGP 8.13 / Gradle 8.13, compileSdk 36, Java 17)
 
 Notes:
 
-- The module `applicationId` is `tw.fatminmin.xposed.minminguard.next` (version 3.1.0, versionCode 73). Xposed/LSPosed scope strings and the `assets/xposed_init` entry refer to this package.
+- The module `applicationId` is `tw.fatminmin.xposed.minminguard.next` (version 3.1.1, versionCode 74). Xposed/LSPosed scope strings and the `assets/xposed_init` entry refer to this package.
 - `de.robv.android.xposed:api:82` is resolved from `https://api.xposed.info/` (jcenter is gone).
 - If you point the build at a local SDK, put `sdk.dir=` in `local.properties` (git-ignored).
 
@@ -64,6 +64,76 @@ The release job decodes the keystore into `$RUNNER_TEMP`, verifies the
 resulting APK with `apksigner`, and deletes the keystore afterwards. Pull
 requests build the debug APK only, because secrets are not exposed to them.
 
+
+## How it is switched on
+
+There is exactly **one** switch: the module scope in LSPosed. Tick an app
+there, reboot, and that app is blocked. Untick it and the module never loads in
+that process, so nothing is touched. The app has no per-app enable switch and
+no auto/blacklist/whitelist modes — the previous UI could make the module look
+broken when an app simply was not ticked.
+
+The app screen is a report, not a control panel:
+
+- total ads blocked,
+- how many apps are currently in scope,
+- one row per scoped app with its own blocked count.
+
+"Apps in scope" cannot be read from the LSPosed configuration database without
+root, so the module reports itself instead: every process it hooks writes one
+row to `content://tw.fatminmin.xposed.minminguard.next/active`. An app therefore
+appears the first time it is opened after being added to scope. *Forget app
+list* clears those rows without deleting statistics.
+
+## What changed in 3.1.1
+
+Scope-only UI and a set of blocking fixes found on a live device.
+
+**UI**
+
+- The three-tab ViewPager (AUTO/BLACKLIST/WHITELIST), the *Apply* button, the
+  bulk-selection bar and the per-app enable switch are gone. They never affected
+  anything: the module only runs inside a scoped package, so an unticked switch
+  in the app could not switch blocking off anyway.
+- The main screen is now a single list built from the module's own report, with
+  a summary card (total blocked, apps in scope) and an empty state that explains
+  what to do next.
+- The list refreshes itself: a `ContentObserver` on the provider and a reload on
+  `onResume` mean an app you just opened shows up without a manual pull.
+- The number of apps in scope no longer changes while you type in search, and a
+  search with no results shows "no app matches your search" instead of the
+  "nothing in scope yet" message.
+- A refresh requested while another load is running is now queued instead of
+  dropped, so a provider notification can no longer be lost.
+
+**Blocking**
+
+- The module no longer bails out when `AndroidAppHelper.currentApplication()`
+  returns null during `Application.onCreate`. It uses the hooked `Application`
+  as a fallback and installs hooks regardless; before, such apps were silently
+  not blocked at all. Statistics still degrade gracefully when no context is
+  available.
+- The `android` process is skipped explicitly. With the mode gate removed it
+  would otherwise have received the ViewGroup/LayoutInflater/Activity hooks,
+  which is dangerous in `system_server`.
+- The `QUERY_ALL_PACKAGES` permission injection into
+  `PermissionManagerServiceImpl.restorePermissionState` was removed. Once
+  "enabled" meant "everything", that hook would have granted a very broad
+  permission to almost every package, and statistics reached the provider
+  without it during the device audit.
+- Registering an app as active is retried a bounded number of times
+  (8 attempts) instead of being dropped on the first failure, which used to make
+  an app invisible in the list even while blocking worked.
+
+**Compatibility**
+
+- The new code avoids API-24-only methods that would throw `NoSuchMethodError`
+  on Android 5–6 (`List.sort`, `ConcurrentHashMap.newKeySet`,
+  `Map.computeIfAbsent`). `minSdk` stays 21.
+- Obsolete strings from the removed modes were deleted from the five
+  translations, so all locales stay consistent.
+- CI derives the APK file name from `versionName` in `app/build.gradle` instead
+  of hard-coding it, so a version bump no longer needs a workflow edit.
 
 ## What changed in 3.1.0
 

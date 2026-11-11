@@ -18,13 +18,6 @@
                 android:text="@string/msg_show_launcher_icon"/>
 
         <com.google.android.material.checkbox.MaterialCheckBox
-                android:id="@+id/cb_show_system_apps"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:checked="false"
-                android:text="@string/msg_show_system_apps"/>
-
-        <com.google.android.material.checkbox.MaterialCheckBox
                 android:id="@+id/cb_enable_cr"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

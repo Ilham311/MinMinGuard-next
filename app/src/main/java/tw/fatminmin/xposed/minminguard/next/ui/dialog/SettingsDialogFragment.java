@@ -46,7 +46,6 @@ public class SettingsDialogFragment extends DialogFragment
 
     private SharedPreferences mUiPref;
     private SharedPreferences mModPref;
-    private MaterialCheckBox mCbShowSystemApps;
     private MaterialCheckBox mCbShowLauncherIcon;
     private MaterialCheckBox mCbEnableCr;
     private MaterialCheckBox mCbHeuristic;
@@ -102,9 +101,6 @@ public class SettingsDialogFragment extends DialogFragment
         getDialog().setTitle(R.string.action_settings);
 
         View v = inflater.inflate(R.layout.dialog_settings, container, false);
-
-        mCbShowSystemApps = v.findViewById(R.id.cb_show_system_apps);
-        mCbShowSystemApps.setChecked(mUiPref.getBoolean(Common.KEY_SHOW_SYSTEM_APPS, false));
 
         mCbShowLauncherIcon = v.findViewById(R.id.cb_show_launcher_icon);
         mCbShowLauncherIcon.setChecked(mUiPref.getBoolean(Common.KEY_SHOW_LAUNCHER_ICON, true));
@@ -167,7 +163,6 @@ public class SettingsDialogFragment extends DialogFragment
                 Util.DEBUG = mCbVerbose.isChecked();
 
                 mUiPref.edit()
-                        .putBoolean(Common.KEY_SHOW_SYSTEM_APPS, mCbShowSystemApps.isChecked())
                         .putBoolean(Common.KEY_ENABLE_CRASH_REPORT, mCbEnableCr.isChecked())
                         .apply();
 
@@ -302,7 +297,10 @@ public class SettingsDialogFragment extends DialogFragment
                                 }
                                 mUiPref.edit().putString(Common.KEY_SORT, sort).apply();
                                 dialog.dismiss();
-                                ((MainActivity) requireActivity()).refresh(false);
+                                if (requireActivity() instanceof MainActivity)
+                                {
+                                    ((MainActivity) requireActivity()).refresh(false);
+                                }
                             }
                         })
                 .show();
@@ -346,7 +344,6 @@ public class SettingsDialogFragment extends DialogFragment
             root.put("mod", mod);
 
             JSONObject ui = new JSONObject();
-            ui.put(Common.KEY_SHOW_SYSTEM_APPS, mUiPref.getBoolean(Common.KEY_SHOW_SYSTEM_APPS, false));
             ui.put(Common.KEY_SHOW_LAUNCHER_ICON, mUiPref.getBoolean(Common.KEY_SHOW_LAUNCHER_ICON, true));
             root.put("ui", ui);
 
@@ -402,10 +399,6 @@ public class SettingsDialogFragment extends DialogFragment
             {
                 JSONObject ui = root.getJSONObject("ui");
                 SharedPreferences.Editor uiEditor = mUiPref.edit();
-                if (ui.has(Common.KEY_SHOW_SYSTEM_APPS))
-                {
-                    uiEditor.putBoolean(Common.KEY_SHOW_SYSTEM_APPS, ui.getBoolean(Common.KEY_SHOW_SYSTEM_APPS));
-                }
                 if (ui.has(Common.KEY_SHOW_LAUNCHER_ICON))
                 {
                     uiEditor.putBoolean(Common.KEY_SHOW_LAUNCHER_ICON, ui.getBoolean(Common.KEY_SHOW_LAUNCHER_ICON));
@@ -414,7 +407,10 @@ public class SettingsDialogFragment extends DialogFragment
             }
 
             Toast.makeText(requireContext(), R.string.msg_config_imported, Toast.LENGTH_SHORT).show();
-            ((MainActivity) getActivity()).refresh(true);
+            if (getActivity() instanceof MainActivity)
+            {
+                ((MainActivity) getActivity()).refresh(true);
+            }
         }
         catch (java.io.IOException | JSONException e)
         {

@@ -7,18 +7,6 @@
     <string name="action_about">Hakkında / Yardım</string>
     <string name="action_donate">Bağış yap</string>
 
-    <string name="intro_auto_title">
-        Otomatik Mod
-    </string>
-    <string name="intro_auto_content">
-        Otomatik mod, cihazınızdaki tüm reklamları engellemenize yardımcı olabilir.
-    </string>
-    <string name="intro_manual_title">
-        Manuel Mod
-    </string>
-    <string name="intro_manual_content">
-        Reklamları engelleyeceğiniz uygulamaları elle seçin. (Anahtarla açıp kapayın)
-    </string>
     <string name="intro_tap_icon_title">
         Uygulama simgesine dokun
     </string>
@@ -40,18 +28,10 @@
 
     <string name="btn_ok">TAMAM</string>
 
-    <string-array name="mode_array">
-        <item>OTOMATİK</item>
-        <item>KARA LİSTE</item>
-        <item>BEYAZ LİSTE</item>
-    </string-array>
-
     <string name="msg_xposed_not_enabled">Xposed etkin değil</string>
     <string name="msg_enabled_crash_report">Hata raporlamayı etkinleştir</string>
-    <string name="msg_show_system_apps">Sistem uygulamalarını göster</string>
     <string name="msg_show_debug">Xposed günlüğünde hata ayıklama bilgilerini göster</string>
     <string name="msg_show_launcher_icon">Başlatıcı simgesini göster</string>
-    <string name="msg_mode_apply">Uygula</string>
     <string name="msg_block_num">%d reklam engellendi</string>
     <string name="msg_ad_networks">Reklam Ağları:</string>
     <string name="msg_ads_blocked">Engellenen Reklamlar:</string>

@@ -7,13 +7,14 @@
     <string name="action_tutorial">Tutorial</string>
     <string name="action_about">About / Help</string>
     <string name="action_donate">Donate</string>
+    <string name="action_forget_scope">Forget app list</string>
 
-    <string name="intro_auto_title">Auto Mode</string>
-    <string name="intro_auto_content">Auto mode can help you block all ads on your device.</string>
-    <string name="intro_manual_title">Manual Mode</string>
-    <string name="intro_manual_content">Manually select which apps to block ads in. (toggle via the switch)</string>
+    <string name="intro_scope_title">Scope is the switch</string>
+    <string name="intro_scope_content">Tick the apps you want to clean in LSPosed, then reboot. Every app in scope is blocked automatically; unticked apps are left untouched. There is no other on/off switch.</string>
+    <string name="intro_list_title">Only scoped apps are listed</string>
+    <string name="intro_list_content">This screen shows only the apps the module actually runs in, plus how many ads were blocked. Open an app once after adding it to scope and it appears here.</string>
     <string name="intro_tap_icon_title">Tap on the App Icon</string>
-    <string name="intro_tap_icon_content">You can tap on the icon to restart the app.</string>
+    <string name="intro_tap_icon_content">You can tap on the icon to restart the app, so changes take effect immediately.</string>
     <string name="intro_app_detail_title">Show App Statistics</string>
     <string name="intro_app_detail_content">Tap on the app name to show blocking statistics.</string>
     <string name="intro_url_filtering_title">Url Filtering</string>
@@ -24,34 +25,30 @@
     <string name="msg_xposed_not_enabled">Xposed is not enabled</string>
     <string name="msg_runtime">Framework: %1$s | Root: %2$s</string>
     <string name="msg_enabled_crash_report">Enable crash report</string>
-    <string name="msg_show_system_apps">Show system apps</string>
-    <string name="msg_show_debug">Show debug info in Xposed log</string>
     <string name="msg_show_launcher_icon">Show launcher icon</string>
-    <string name="msg_mode_apply">Apply</string>
-    <string name="msg_mode_applied">%1$s mode applied</string>
     <string name="msg_block_num">Blocked %d ads</string>
+    <string name="msg_no_block_yet">No ads blocked yet</string>
+    <string name="msg_app_not_installed">App not installed</string>
     <string name="msg_ad_networks">Ad Networks:</string>
     <string name="msg_ads_blocked">Ads Blocked:</string>
     <string name="msg_not_detected">Not detected</string>
     <string name="msg_wait">Please wait&#8230;</string>
     <string name="msg_app_launch_fail">This app cannot be launched</string>
-    <string name="msg_batch_done">Updated %1$d apps</string>
     <string name="msg_config_exported">Configuration exported</string>
     <string name="msg_config_export_failed">Export failed</string>
     <string name="msg_config_imported">Configuration imported</string>
     <string name="msg_config_import_failed">Import failed: invalid file</string>
 
-    <string name="mode_info_title">How this mode works</string>
-    <string name="mode_info_auto">Ad blocking is applied to every app automatically using built-in rules for known ad networks and common ad SDKs. No setup needed - just enable the module and reboot.</string>
-    <string name="mode_info_blacklist">Only the apps you switch ON are blocked. Everything else is left untouched. Use this when you want ads blocked in a few specific apps.</string>
-    <string name="mode_info_whitelist">Only the apps you switch ON are allowed to keep ads. Ads are blocked everywhere else. Use this to keep ads in apps you like.</string>
-
-    <string name="batch_selected">%1$d selected</string>
-    <string name="batch_select_all">Select all</string>
-    <string name="batch_deselect_all">Deselect all</string>
-    <string name="batch_enable">Enable</string>
-    <string name="batch_disable">Disable</string>
-    <string name="batch_close">Close</string>
+    <string name="summary_total_blocked">Total ads blocked</string>
+    <string name="summary_active_apps">apps in scope</string>
+    <string name="summary_active_app_singular">app in scope</string>
+    <string name="summary_header_active">Apps in LSPosed scope</string>
+    <string name="msg_empty_scope">No app has reported in yet. Add apps to the module scope in LSPosed, reboot, then open each app once.</string>
+    <string name="msg_no_match">No app matches your search.</string>
+    <string name="forget_scope_confirm">Clear the list of apps that reported in? Apps will reappear the next time they are opened. Statistics are kept.</string>
+    <string name="msg_scope_cleared">App list cleared</string>
+    <string name="app_icon_desc">App icon</string>
+    <string name="detail_open_desc">Open details</string>
 
     <string name="setting_theme">Theme</string>
     <string name="setting_theme_system">System default</string>
@@ -79,7 +76,6 @@ Views from matching classes are treated as ads.</string>
     <string name="nav_title">Menu</string>
     <string name="option_enable_url_filter">Enable url filtering</string>
     <string name="option_enable_dns_filter">Enable DNS blocking (experimental)</string>
-    <string name="option_enable_whitelist">Keep ads in this app (whitelist)</string>
 
     <string name="detail_last_seen">Last ad blocked</string>
     <string name="detail_never_seen">Never</string>
@@ -96,5 +92,4 @@ Views from matching classes are treated as ads.</string>
     <string name="msg_stats_reset">Statistics cleared</string>
     <string name="msg_prefixes_saved">Custom prefixes saved</string>
     <string name="msg_restart_hint">Reopen the target app for changes to apply</string>
-    <string name="msg_empty_list">No apps match the current filter</string>
 </resources>

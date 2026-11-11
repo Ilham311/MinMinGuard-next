@@ -34,6 +34,8 @@ public class MinMinProvider extends ContentProvider
     private static final int MATCH_STATS_ITEM = 2;
     private static final int MATCH_NETWORKS = 3;
     private static final int MATCH_NETWORKS_ITEM = 4;
+    private static final int MATCH_ACTIVE = 5;
+    private static final int MATCH_ACTIVE_ITEM = 6;
 
     private static final UriMatcher sMatcher = new UriMatcher(UriMatcher.NO_MATCH);
 
@@ -43,6 +45,8 @@ public class MinMinProvider extends ContentProvider
         sMatcher.addURI(Common.AUTHORITY, "stats/*", MATCH_STATS_ITEM);
         sMatcher.addURI(Common.AUTHORITY, "networks", MATCH_NETWORKS);
         sMatcher.addURI(Common.AUTHORITY, "networks/*", MATCH_NETWORKS_ITEM);
+        sMatcher.addURI(Common.AUTHORITY, "active", MATCH_ACTIVE);
+        sMatcher.addURI(Common.AUTHORITY, "active/*", MATCH_ACTIVE_ITEM);
     }
 
     private StatsDatabase mDatabase;
@@ -94,6 +98,18 @@ public class MinMinProvider extends ContentProvider
                 where = StatsDatabase.COL_PKG + " = ?";
                 whereArgs = new String[]{uri.getLastPathSegment()};
                 break;
+            case MATCH_ACTIVE:
+                table = StatsDatabase.TABLE_ACTIVE;
+                if (order == null)
+                {
+                    order = StatsDatabase.COL_LAST_SEEN + " DESC";
+                }
+                break;
+            case MATCH_ACTIVE_ITEM:
+                table = StatsDatabase.TABLE_ACTIVE;
+                where = StatsDatabase.COL_PKG + " = ?";
+                whereArgs = new String[]{uri.getLastPathSegment()};
+                break;
             default:
                 return null;
         }
@@ -122,6 +138,10 @@ public class MinMinProvider extends ContentProvider
                 return "vnd.android.cursor.dir/vnd." + Common.AUTHORITY + ".networks";
             case MATCH_NETWORKS_ITEM:
                 return "vnd.android.cursor.item/vnd." + Common.AUTHORITY + ".networks";
+            case MATCH_ACTIVE:
+                return "vnd.android.cursor.dir/vnd." + Common.AUTHORITY + ".active";
+            case MATCH_ACTIVE_ITEM:
+                return "vnd.android.cursor.item/vnd." + Common.AUTHORITY + ".active";
             default:
                 return null;
         }
@@ -158,6 +178,15 @@ public class MinMinProvider extends ContentProvider
                 deleted = db.delete(StatsDatabase.TABLE_NETWORK, StatsDatabase.COL_PKG + " = ?",
                         new String[]{uri.getLastPathSegment()});
                 break;
+            case MATCH_ACTIVE:
+                // "Lupakan semua aplikasi aktif": berguna setelah scope LSPosed
+                // diubah dan daftar perlu dibangun ulang dari nol.
+                deleted = db.delete(StatsDatabase.TABLE_ACTIVE, selection, selectionArgs);
+                break;
+            case MATCH_ACTIVE_ITEM:
+                deleted = db.delete(StatsDatabase.TABLE_ACTIVE, StatsDatabase.COL_PKG + " = ?",
+                        new String[]{uri.getLastPathSegment()});
+                break;
             default:
                 return 0;
         }
@@ -181,9 +210,56 @@ public class MinMinProvider extends ContentProvider
                 return updateStats(values);
             case MATCH_NETWORKS:
                 return updateNetwork(values);
+            case MATCH_ACTIVE:
+                return updateActive(values);
             default:
                 return 0;
         }
+    }
+
+    /**
+     * Mendaftarkan (atau menyegarkan) aplikasi yang di-hook modul.
+     * <p>
+     * Baris inilah yang ditampilkan UI sebagai daftar aplikasi target. Karena
+     * ditulis dari proses aplikasi target sendiri saat hook dipasang, isinya
+     * persis sama dengan paket yang ada di scope LSPosed dan sudah dijalankan
+     * minimal sekali — bukan perkiraan.
+     */
+    private int updateActive(ContentValues values)
+    {
+        String pkgName = values.getAsString(Common.KEY_PKG_NAME);
+        if (pkgName == null || pkgName.length() == 0)
+        {
+            return 0;
+        }
+        String version = values.getAsString(Common.KEY_APP_VERSION);
+        long now = System.currentTimeMillis();
+
+        SQLiteDatabase db = mDatabase.getWritableDatabase();
+        db.beginTransaction();
+        try
+        {
+            // FIRST_SEEN hanya diisi saat baris pertama kali dibuat; lihat
+            // ON CONFLICT di bawah.
+            db.execSQL("INSERT OR IGNORE INTO \"" + StatsDatabase.TABLE_ACTIVE + "\" (\""
+                            + StatsDatabase.COL_PKG + "\",\"" + StatsDatabase.COL_APP_VERSION + "\",\""
+                            + StatsDatabase.COL_FIRST_SEEN + "\",\"" + StatsDatabase.COL_LAST_SEEN + "\") "
+                            + "VALUES (?, ?, ?, ?)",
+                    new Object[]{pkgName, version, now, now});
+            db.execSQL("UPDATE \"" + StatsDatabase.TABLE_ACTIVE + "\" SET \""
+                            + StatsDatabase.COL_LAST_SEEN + "\" = ?, \""
+                            + StatsDatabase.COL_APP_VERSION + "\" = ? WHERE \""
+                            + StatsDatabase.COL_PKG + "\" = ?",
+                    new Object[]{now, version, pkgName});
+            db.setTransactionSuccessful();
+        }
+        finally
+        {
+            db.endTransaction();
+        }
+
+        notifyChange(Uri.parse(Common.URI_ACTIVE));
+        return 1;
     }
 
     /** Menambah hitungan blokir satu aplikasi (delta, bukan nilai absolut). */

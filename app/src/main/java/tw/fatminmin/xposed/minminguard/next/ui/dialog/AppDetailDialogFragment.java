@@ -29,8 +29,11 @@ import tw.fatminmin.xposed.minminguard.next.ui.MainActivity;
 import tw.fatminmin.xposed.minminguard.next.ui.models.AppStats;
 
 /**
- * Detail satu aplikasi: ikon, jumlah iklan diblokir, jaringan yang terdeteksi,
- * dan sakelar filter per aplikasi (URL, DNS, whitelist).
+ * Detail satu aplikasi target: ikon, jumlah iklan diblokir, jaringan yang
+ * terdeteksi, dan sakelar lapisan tambahan (filter URL, pemblokiran DNS).
+ * <p>
+ * Sakelar whitelist dibuang bersama sistem mode: on/off sebuah aplikasi
+ * sepenuhnya ditentukan keanggotaannya di scope LSPosed.
  */
 public class AppDetailDialogFragment extends DialogFragment
 {
@@ -39,6 +42,7 @@ public class AppDetailDialogFragment extends DialogFragment
     private static final String ARG_AD_NETWORKS = "adNetworks";
     private static final String ARG_BLOCK_NUM = "blockNum";
     private static final String ARG_LAST_SEEN = "lastSeen";
+    private static final String ARG_INSTALLED = "installed";
 
     private ImageView imgAppIcon;
     private TextView txtAppName;
@@ -48,21 +52,23 @@ public class AppDetailDialogFragment extends DialogFragment
     private TextView txtLastSeen;
     private SwitchCompat swtUrlFilter;
     private SwitchCompat swtDnsFilter;
-    private SwitchCompat swtWhitelist;
 
     private String appName;
     private String pkgName;
     private String adNetworks;
     private int blockNum;
     private long lastSeen;
+    private boolean installed;
 
     private SharedPreferences mPref;
 
-    public static AppDetailDialogFragment newInstance(String appName, String pkgName, AppStats stats)
+    public static AppDetailDialogFragment newInstance(String appName, String pkgName, AppStats stats,
+                                                      boolean installed)
     {
         Bundle args = new Bundle();
         args.putString(ARG_APP_NAME, appName);
         args.putString(ARG_PKG_NAME, pkgName);
+        args.putBoolean(ARG_INSTALLED, installed);
         if (stats != null)
         {
             args.putString(ARG_AD_NETWORKS, stats.getNetworksLabel());
@@ -87,6 +93,7 @@ public class AppDetailDialogFragment extends DialogFragment
         adNetworks = args.getString(ARG_AD_NETWORKS);
         blockNum = args.getInt(ARG_BLOCK_NUM, 0);
         lastSeen = args.getLong(ARG_LAST_SEEN, 0L);
+        installed = args.getBoolean(ARG_INSTALLED, true);
 
         Context ctx = ContextCompat.createDeviceProtectedStorageContext(getActivity());
         if (ctx == null) ctx = getActivity();
@@ -109,10 +116,9 @@ public class AppDetailDialogFragment extends DialogFragment
         txtLastSeen = v.findViewById(R.id.txt_last_seen);
         swtUrlFilter = v.findViewById(R.id.switch_url_filter);
         swtDnsFilter = v.findViewById(R.id.switch_dns_filter);
-        swtWhitelist = v.findViewById(R.id.switch_whitelist);
 
         txtAppName.setText(appName);
-        txtPkgName.setText(pkgName);
+        txtPkgName.setText(installed ? pkgName : pkgName + " · " + getString(R.string.msg_app_not_installed));
         txtAdNetworks.setText(adNetworks == null || adNetworks.length() == 0
                 ? getString(R.string.detail_no_networks) : adNetworks);
         txtAdsBlocked.setText(String.valueOf(blockNum));
@@ -125,7 +131,6 @@ public class AppDetailDialogFragment extends DialogFragment
 
         swtUrlFilter.setChecked(mPref.getBoolean(Common.getUrlFilterKey(pkgName), false));
         swtDnsFilter.setChecked(mPref.getBoolean(Common.getDnsFilterKey(pkgName), false));
-        swtWhitelist.setChecked(mPref.getBoolean(Common.getWhiteListKey(pkgName), false));
 
         swtUrlFilter.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener()
         {
@@ -145,18 +150,7 @@ public class AppDetailDialogFragment extends DialogFragment
                 showRestartHint(buttonView);
             }
         });
-        swtWhitelist.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener()
-        {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked)
-            {
-                mPref.edit().putBoolean(Common.getWhiteListKey(pkgName), isChecked).apply();
-                showRestartHint(buttonView);
-            }
-        });
 
-        // Menghapus statistik satu aplikasi (sebelumnya method repositori ini
-        // tidak pernah dipakai dari UI).
         TextView txtHint = v.findViewById(R.id.txt_toggles_hint);
         if (txtHint != null)
         {

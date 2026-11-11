@@ -137,16 +137,6 @@
                 android:textSize="15sp"
                 android:textStyle="bold"/>
 
-        <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switch_whitelist"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/option_enable_whitelist"
-                android:textColor="?colorOnSurface"
-                android:textSize="15sp"
-                android:textStyle="bold"/>
-
         <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
