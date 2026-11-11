@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+            xmlns:tools="http://schemas.android.com/tools"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+    <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+        <TextView
+                android:id="@+id/stats_total"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textColor="?colorPrimary"
+                android:textSize="34sp"
+                android:textStyle="bold"
+                tools:text="1234"/>
+
+        <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="@string/stats_total_blocked"
+                android:textColor="?colorOnSurfaceVariant"
+                android:textSize="14sp"/>
+
+        <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="16dp"
+                android:background="?colorOutlineVariant"/>
+
+        <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/stats_top_apps"
+                android:textColor="?colorOnSurface"
+                android:textSize="15sp"
+                android:textStyle="bold"/>
+
+        <TextView
+                android:id="@+id/stats_apps"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="16dp"
+                android:textColor="?colorOnSurfaceVariant"
+                android:textSize="14sp"/>
+
+        <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/stats_top_networks"
+                android:textColor="?colorOnSurface"
+                android:textSize="15sp"
+                android:textStyle="bold"/>
+
+        <TextView
+                android:id="@+id/stats_networks"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="?colorOnSurfaceVariant"
+                android:textSize="14sp"/>
+
+    </LinearLayout>
+</ScrollView>

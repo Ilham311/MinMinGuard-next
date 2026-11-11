@@ -15,7 +15,7 @@ public final class MyClass {
     public static void main(String args[]) {
         System.out.println("Working Directory = " + System.getProperty("user.dir"));
 
-        Schema schema = new Schema(1, "tw.fatminmin.xposed.minminguard.orm");
+        Schema schema = new Schema(1, "tw.fatminmin.xposed.minminguard.next.orm");
         Entity appData = schema.addEntity("AppData");
         appData.addStringProperty("pkgName").primaryKey();
         appData.addStringProperty("adNetworks");

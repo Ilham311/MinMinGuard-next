@@ -1,6 +1,6 @@
 # ![icon](images/ic_launcher.png) MinMinGuard 
 
-[![Build Status](https://travis-ci.org/chiehmin/MinMinGuard.svg?branch=master)](https://travis-ci.org/chiehmin/MinMinGuard)
+[![Build APK](https://github.com/Ilham311/MinMinGuard-next/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/Ilham311/MinMinGuard-next/actions/workflows/build.yml)
 
 - [Introduction](#introduction)
 - [Discussion and Supports](#discussion-and-supports)
@@ -20,6 +20,22 @@ If you have any idea or need some supports, you are welcome to post on the Xda D
 [![Join the chat at https://gitter.im/MinMinGuard/MinMinGuard](https://badges.gitter.im/MinMinGuard/MinMinGuard.svg)](https://gitter.im/MinMinGuard/MinMinGuard?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ## Developing and Contributing
+
+### Building from source
+
+The project has been modernised (AGP 8.13 / Gradle 8.13, compileSdk 36, Java 17):
+
+```bash
+# JDK 17 or newer is required
+./gradlew assembleDebug
+```
+
+Notes:
+
+- The module `applicationId` is `tw.fatminmin.xposed.minminguard.next` (version 3.0.0, versionCode 72). Xposed/LSPosed scope strings and the `assets/xposed_init` entry refer to this package.
+- `de.robv.android.xposed:api:82` is resolved from `https://api.xposed.info/` (jcenter is gone).
+- Release builds read the keystore passwords from the `KEYSTORE_PASS` / `KEY_PASS` environment variables and use `app/minminguard.keystore`.
+- If you point the build at a local SDK, put `sdk.dir=` in `local.properties` (git-ignored).
 
 ### Adding a new ad network into support
 

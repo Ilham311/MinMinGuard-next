@@ -1,64 +1,79 @@
 <resources>
-    <string name="app_name" translatable="false">MinMinGuard</string>
+    <string name="app_name" translatable="false">MinMinGuard Next</string>
 
     <string name="action_search">Search</string>
     <string name="action_settings">Settings</string>
+    <string name="action_statistics">Statistics</string>
     <string name="action_tutorial">Tutorial</string>
     <string name="action_about">About / Help</string>
     <string name="action_donate">Donate</string>
 
-    <string name="intro_auto_title">
-        Auto Mode
-    </string>
-    <string name="intro_auto_content">
-        Auto mode can help you block all ads on your device.
-    </string>
-    <string name="intro_manual_title">
-        Manual Mode
-    </string>
-    <string name="intro_manual_content">
-        Manually select which apps to block ads in. (toggle via the switch)
-    </string>
-    <string name="intro_tap_icon_title">
-        Tap on the App Icon
-    </string>
-    <string name="intro_tap_icon_content">
-        You can tap on the icon to restart the app.
-    </string>
-    <string name="intro_app_detail_title">
-        Show App Statistics
-    </string>
-    <string name="intro_app_detail_content">
-        Tap on the app name to show blocking statistics.
-    </string>
-    <string name="intro_url_filtering_title">
-        Url Filtering
-    </string>
-    <string name="intro_url_filtering_content">
-        If the app still shows ads, you can try and enable the url filtering feature. (This may cause problems in
-        webview based apps)
-    </string>
+    <string name="intro_auto_title">Auto Mode</string>
+    <string name="intro_auto_content">Auto mode can help you block all ads on your device.</string>
+    <string name="intro_manual_title">Manual Mode</string>
+    <string name="intro_manual_content">Manually select which apps to block ads in. (toggle via the switch)</string>
+    <string name="intro_tap_icon_title">Tap on the App Icon</string>
+    <string name="intro_tap_icon_content">You can tap on the icon to restart the app.</string>
+    <string name="intro_app_detail_title">Show App Statistics</string>
+    <string name="intro_app_detail_content">Tap on the app name to show blocking statistics.</string>
+    <string name="intro_url_filtering_title">Url Filtering</string>
+    <string name="intro_url_filtering_content">If the app still shows ads, you can try and enable the url filtering feature. (This may cause problems in webview based apps)</string>
 
     <string name="btn_ok">OK</string>
 
-    <string-array name="mode_array">
-        <item>AUTO</item>
-        <item>BLACKLIST</item>
-        <item>WHITELIST</item>
-    </string-array>
-
     <string name="msg_xposed_not_enabled">Xposed is not enabled</string>
+    <string name="msg_runtime">Framework: %1$s | Root: %2$s</string>
     <string name="msg_enabled_crash_report">Enable crash report</string>
     <string name="msg_show_system_apps">Show system apps</string>
     <string name="msg_show_debug">Show debug info in Xposed log</string>
     <string name="msg_show_launcher_icon">Show launcher icon</string>
     <string name="msg_mode_apply">Apply</string>
+    <string name="msg_mode_applied">%1$s mode applied</string>
     <string name="msg_block_num">Blocked %d ads</string>
     <string name="msg_ad_networks">Ad Networks:</string>
     <string name="msg_ads_blocked">Ads Blocked:</string>
     <string name="msg_not_detected">Not detected</string>
     <string name="msg_wait">Please wait&#8230;</string>
     <string name="msg_app_launch_fail">This app cannot be launched</string>
+    <string name="msg_batch_done">Updated %1$d apps</string>
+    <string name="msg_config_exported">Configuration exported</string>
+    <string name="msg_config_export_failed">Export failed</string>
+    <string name="msg_config_imported">Configuration imported</string>
+    <string name="msg_config_import_failed">Import failed: invalid file</string>
+
+    <string name="mode_info_title">How this mode works</string>
+    <string name="mode_info_auto">Ad blocking is applied to every app automatically using built-in rules for known ad networks and common ad SDKs. No setup needed - just enable the module and reboot.</string>
+    <string name="mode_info_blacklist">Only the apps you switch ON are blocked. Everything else is left untouched. Use this when you want ads blocked in a few specific apps.</string>
+    <string name="mode_info_whitelist">Only the apps you switch ON are allowed to keep ads. Ads are blocked everywhere else. Use this to keep ads in apps you like.</string>
+
+    <string name="batch_selected">%1$d selected</string>
+    <string name="batch_select_all">Select all</string>
+    <string name="batch_deselect_all">Deselect all</string>
+    <string name="batch_enable">Enable</string>
+    <string name="batch_disable">Disable</string>
+    <string name="batch_close">Close</string>
+
+    <string name="setting_theme">Theme</string>
+    <string name="setting_theme_system">System default</string>
+    <string name="setting_theme_light">Light</string>
+    <string name="setting_theme_dark">Dark</string>
+    <string name="setting_sort">Sort apps by</string>
+    <string name="setting_sort_name">App name</string>
+    <string name="setting_sort_package">Package name</string>
+    <string name="setting_sort_blocked">Ads blocked</string>
+    <string name="setting_user_prefixes">Custom ad class prefixes</string>
+    <string name="setting_user_prefixes_hint">One class name prefix per line, e.g.
+com.example.adnetwork
+Views from matching classes are treated as ads.</string>
+    <string name="setting_export_config">Export configuration</string>
+    <string name="setting_import_config">Import configuration</string>
+
+    <string name="stats_total_blocked">Total ads blocked</string>
+    <string name="stats_top_apps">Top apps</string>
+    <string name="stats_top_networks">Top ad networks</string>
+    <string name="stats_apps_count">%1$d apps</string>
+    <string name="stats_networks_count">%1$d networks</string>
+    <string name="stats_empty">No blocking data yet. Open some apps that show ads and check back later.</string>
 
     <string name="nav_title">Menu</string>
     <string name="option_enable_url_filter">Enable url filtering</string>

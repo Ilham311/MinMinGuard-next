@@ -1,33 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                xmlns:app="http://schemas.android.com/apk/res-auto"
                 xmlns:tools="http://schemas.android.com/tools"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                tools:context="tw.fatminmin.xposed.minminguard.ui.fragments.MainFragment">
+                tools:context="tw.fatminmin.xposed.minminguard.next.ui.fragments.MainFragment">
 
     <TextView
             android:id="@+id/txt_xposed_enable"
             android:layout_width="match_parent"
-            android:layout_height="30dp"
-            android:background="@color/red"
+            android:layout_height="wrap_content"
+            android:background="?colorErrorContainer"
             android:gravity="center"
+            android:padding="8dp"
             android:text="@string/msg_xposed_not_enabled"
+            android:textColor="?colorOnErrorContainer"
             android:visibility="gone"
             tools:visibility="visible"/>
+
+    <TextView
+            android:id="@+id/txt_runtime"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/txt_xposed_enable"
+            android:background="?colorSurfaceContainerHighest"
+            android:paddingLeft="12dp"
+            android:paddingTop="6dp"
+            android:paddingRight="12dp"
+            android:paddingBottom="6dp"
+            android:textColor="?colorOnSurfaceVariant"
+            android:textSize="12sp"
+            tools:text="Framework: LSPosed / Vector (API 93) | Root: Magisk"/>
+
+    <com.google.android.material.card.MaterialCardView
+            android:id="@+id/mode_info_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/txt_runtime"
+            android:layout_marginLeft="12dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginRight="12dp"
+            app:cardBackgroundColor="?colorSurfaceContainerLow"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:strokeColor="?colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+        <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="12dp">
+
+            <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@string/mode_info_title"
+                    android:src="@drawable/ic_info"/>
+
+            <TextView
+                    android:id="@+id/txt_mode_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="12dp"
+                    android:textColor="?colorOnSurfaceVariant"
+                    android:textSize="13sp"
+                    tools:text="@string/mode_info_auto"/>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.card.MaterialCardView
+            android:id="@+id/batch_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/mode_info_card"
+            android:layout_marginLeft="12dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginRight="12dp"
+            app:cardBackgroundColor="?colorSurfaceContainerHigh"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="1dp">
+
+        <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="6dp">
+
+            <TextView
+                    android:id="@+id/txt_batch_count"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="?colorOnSurface"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    tools:text="3 selected"/>
+
+            <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_batch_select_all"
+                    style="?materialButtonOutlinedStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:minWidth="0dp"
+                    android:paddingLeft="10dp"
+                    android:paddingRight="10dp"
+                    android:text="@string/batch_select_all"
+                    android:textSize="12sp"/>
+
+            <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_batch_enable"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="6dp"
+                    android:minWidth="0dp"
+                    android:paddingLeft="14dp"
+                    android:paddingRight="14dp"
+                    android:text="@string/batch_enable"
+                    android:textSize="12sp"/>
+
+            <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_batch_disable"
+                    style="?materialButtonOutlinedStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="6dp"
+                    android:minWidth="0dp"
+                    android:paddingLeft="10dp"
+                    android:paddingRight="10dp"
+                    android:text="@string/batch_disable"
+                    android:textSize="12sp"/>
+
+            <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_batch_cancel"
+                    style="?materialButtonOutlinedStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="6dp"
+                    android:minWidth="0dp"
+                    android:paddingLeft="10dp"
+                    android:paddingRight="10dp"
+                    android:text="@string/batch_close"
+                    android:textSize="12sp"/>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
     <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recycler_view"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_below="@+id/txt_xposed_enable"
+            android:layout_below="@+id/batch_bar"
+            android:paddingTop="6dp"
             android:scrollbars="vertical"/>
 
-    <Button
+    <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_mode"
             android:layout_width="match_parent"
-            android:layout_height="50dp"
+            android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
-            android:background="@color/red"
+            android:layout_margin="16dp"
             android:text="@string/msg_mode_apply"
-            android:textSize="15sp"/>
+            android:textSize="15sp"
+            app:cornerRadius="28dp"/>
 
 </RelativeLayout>
