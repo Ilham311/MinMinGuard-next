@@ -17,6 +17,9 @@
     <string name="intro_app_detail_content">Ketuk nama aplikasi untuk melihat statistik pemblokiran.</string>
     <string name="intro_url_filtering_title">Penyaringan URL</string>
     <string name="intro_url_filtering_content">Jika iklan masih muncul, coba aktifkan penyaringan URL. Fitur ini bisa mengganggu aplikasi yang berbasis WebView.</string>
+    <string name="intro_skip">Lewati</string>
+    <string name="intro_next">Lanjut</string>
+    <string name="intro_done">Selesai</string>
 
     <string name="btn_ok">OKE</string>
 

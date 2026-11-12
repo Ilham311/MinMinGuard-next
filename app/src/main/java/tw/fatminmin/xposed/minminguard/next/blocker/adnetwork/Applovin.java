@@ -15,6 +15,17 @@ import tw.fatminmin.xposed.minminguard.next.blocker.Blocker;
  */
 public class Applovin extends Blocker
 {
+
+    /**
+     * Prefix paket untuk lapisan pemblokiran berbasis nama.
+     * <p>
+     * Sebelumnya {@code getBanner()}/{@code getBannerPrefix()} sama-sama
+     * {@code null}, sehingga classifier nama tidak pernah mengenali view
+     * AppLovin: jaring pengaman untuk saat signature API bergeser antar versi
+     * SDK tidak pernah berfungsi. {@link #MAX_ADVIEW} sudah dideklarasikan
+     * untuk hook API, jadi dipakai ulang di sini alih-alih menggandakannya.
+     */
+    private static final String BANNER_PREFIX = "com.applovin";
     private static final String MAX_ADVIEW = "com.applovin.mediation.ads.MaxAdView";
     private static final String MAX_INTER = "com.applovin.mediation.ads.MaxInterstitialAd";
     private static final String MAX_REWARDED = "com.applovin.mediation.ads.MaxRewardedAd";
@@ -74,12 +85,12 @@ public class Applovin extends Blocker
     @Override
     public String getBannerPrefix()
     {
-        return null;
+        return BANNER_PREFIX;
     }
 
     @Override
     public String getBanner()
     {
-        return null;
+        return MAX_ADVIEW;
     }
 }

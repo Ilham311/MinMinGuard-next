@@ -6,6 +6,18 @@ import tw.fatminmin.xposed.minminguard.next.blocker.Blocker;
 
 public class Freewheel extends Blocker
 {
+
+    /**
+     * Kelas banner dan prefix paketnya untuk lapisan pemblokiran berbasis nama.
+     * <p>
+     * Sebelumnya keduanya bernilai null, sehingga classifier nama tidak
+     * pernah mengenali view dari SDK ini sama sekali: jaring pengaman yang
+     * seharusnya menangkap iklan ketika signature API bergeser antar versi
+     * SDK tidak pernah berfungsi. Nama kelas diambil dari SDK yang dipakai
+     * aplikasi.
+     */
+    private static final String BANNER = "tv.freewheel.renderer.TVRenderer";
+    private static final String BANNER_PREFIX = "tv.freewheel";
     public static final String AdInstace = "tv.freewheel.ad.AdInstance";
 
     private static final String Ad = "tv.freewheel.ad.Ad";
@@ -28,12 +40,12 @@ public class Freewheel extends Blocker
     @Override
     public String getBanner()
     {
-        return null;
+        return BANNER;
     }
 
     @Override
     public String getBannerPrefix()
     {
-        return null;
+        return BANNER_PREFIX;
     }
 }

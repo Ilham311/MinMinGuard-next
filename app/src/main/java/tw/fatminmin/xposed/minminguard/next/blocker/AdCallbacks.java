@@ -68,10 +68,20 @@ public final class AdCallbacks
      * <p>
      * {@code onAdAllLoaded} diletakkan paling akhir: pada TradPlus ia berarti
      * "seluruh waterfall selesai tanpa hasil", yaitu kabar gagal yang sah.
+     * <p>
+     * Dua nama terakhir ditambahkan bersama blocker barunya, keduanya diperiksa
+     * pada AAR resmi SDK masing-masing:
+     * {@code onRewardAdFailedToLoad(int)} milik Huawei Ads
+     * ({@code RewardAdLoadListener}) dan {@code onAdError(AdErrorEvent)} milik
+     * Google IMA ({@code AdErrorEvent.AdErrorListener}). Tanpa itu, blokir
+     * keduanya tidak memberi kabar apa pun dan pemutar video atau layar reward
+     * menunggu callback yang tidak akan datang.
      */
     private static final String[] FAILURE_METHODS = {
             "onAdFailedToLoad",
             "onAdLoadFailed",
+            "onRewardAdFailedToLoad",
+            "onAdError",
             "onInterstitialAdLoadFailed",
             "onRewardedVideoAdLoadFailed",
             "onInterstitialLoadFail",
@@ -143,6 +153,10 @@ public final class AdCallbacks
             "onRewardedInterstitialClosed",
             "onRewardedVideoAdClosed",
             "onRewardedVideoClosed",
+            // Huawei Ads: RewardAdStatusListener.onRewardAdClosed() dipanggil
+            // SDK saat layar reward ditutup. Diverifikasi pada AAR resmi
+            // com.huawei.hms:ads-reward 13.4.91.301.
+            "onRewardAdClosed",
             "onAdClose",
             "onAdSkipped",
             "onVideoClosed",
@@ -919,7 +933,7 @@ public final class AdCallbacks
         }
         if (type.isInterface())
         {
-            Object proxy = newInterfaceStub(type);
+            Object proxy = newInterfaceStub(type, adUnitId);
             return proxy == null ? UNSET : proxy;
         }
         if (Modifier.isAbstract(type.getModifiers()))
@@ -1061,8 +1075,14 @@ public final class AdCallbacks
      * <p>
      * Aplikasi hanya membaca nilai dari antarmuka itu, jadi stub yang
      * mengembalikan nilai kosong sudah cukup dan tidak pernah menjatuhkannya.
+     * <p>
+     * Antarmuka yang mengembalikan antarmuka lain (mis. IMA
+     * {@code AdErrorEvent.getError()}, atau {@code UserRequestContext})
+     * dibuatkan stub bertingkat, bukan {@code null}: aplikasi lazim menulis
+     * {@code event.getError().getMessage()} di dalam {@code onAdError}, dan
+     * {@code null} di situ menjatuhkannya dengan NullPointerException.
      */
-    private static Object newInterfaceStub(final Class<?> type)
+    private static Object newInterfaceStub(final Class<?> type, final String adUnitId)
     {
         try
         {
@@ -1097,13 +1117,25 @@ public final class AdCallbacks
                             {
                                 return 0d;
                             }
+                            if (ret == short.class)
+                            {
+                                return (short) 0;
+                            }
+                            if (ret == byte.class)
+                            {
+                                return (byte) 0;
+                            }
+                            if (ret == char.class)
+                            {
+                                return (char) 0;
+                            }
                             if (ret == String.class)
                             {
                                 return "";
                             }
                             if (ret.isInterface())
                             {
-                                return newInterfaceStub(ret);
+                                return newInterfaceStub(ret, adUnitId);
                             }
                             return null;
                         }

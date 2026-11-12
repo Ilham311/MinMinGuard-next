@@ -2,10 +2,10 @@ package tw.fatminmin.xposed.minminguard.next.blocker.custom_mod;
 
 import android.view.View;
 import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.callbacks.XC_InitPackageResources.InitPackageResourcesParam;
 import de.robv.android.xposed.callbacks.XC_LayoutInflated;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
+import tw.fatminmin.xposed.minminguard.next.blocker.Util;
 
 //FIXME Use newer XposedHelper class
 public final class OneWeather
@@ -19,18 +19,18 @@ public final class OneWeather
 
     public static boolean handleLoadPackage(final String packageName, LoadPackageParam lpparam)
     {
-        Class<?> billing = tw.fatminmin.xposed.minminguard.next.blocker.Util
-                .findClassOrNull("com.handmark.expressweather.billing.BillingUtils", lpparam.classLoader);
+        Class<?> billing = Util.findClassOrNull(
+                "com.handmark.expressweather.billing.BillingUtils", lpparam.classLoader);
         if (billing == null)
         {
             return false;
         }
-        XposedBridge.hookAllMethods(billing, "isPurchased", new XC_MethodHook()
+        Util.hookAllMethods(billing, "isPurchased", new XC_MethodHook()
         {
             @Override
             protected void beforeHookedMethod(MethodHookParam param)
             {
-                tw.fatminmin.xposed.minminguard.next.blocker.Util.setResultCompat(param, Boolean.TRUE);
+                Util.setResultCompat(param, Boolean.TRUE);
             }
         });
         return true;

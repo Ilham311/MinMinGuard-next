@@ -1,1 +1,20 @@
-window.facebookAdCanary.setupAd
+# Pola teks yang menandakan halaman WebView berisi iklan.
+#
+# Satu pola per baris, case-insensitive, dicocokkan sebagai substring pada
+# HTML/data yang dimuat WebView (UrlFiltering). Berbeda dari daftar host:
+# berkas ini untuk jalur loadData/loadDataWithBaseURL, saat URL tidak berguna.
+#
+# Sebelumnya berkas ini hanya berisi satu baris warisan 2015
+# ("window.facebookAdCanary.setupAd") yang tidak pernah cocok dengan halaman
+# nyata, sehingga jalur data WebView praktis tidak menyaring apa pun.
+
+# Jembatan JavaScript milik SDK iklan yang disuntikkan ke halaman.
+window.facebookAdCanary
+# Google Publisher Tag & AdSense.
+googlesyndication.com/pagead
+# Penanda blok iklan AppLovin / MAX di halaman.
+applovin.com/v1/ad
+# Penanda muat iklan ironSource / LevelPlay.
+ironsrc.com/v1/ad
+# Penanda iklan Mintegral.
+mbridge.com/ad

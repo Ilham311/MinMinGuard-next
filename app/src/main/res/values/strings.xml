@@ -19,6 +19,9 @@
     <string name="intro_app_detail_content">Tap on the app name to show blocking statistics.</string>
     <string name="intro_url_filtering_title">Url Filtering</string>
     <string name="intro_url_filtering_content">If the app still shows ads, you can try and enable the url filtering feature. (This may cause problems in webview based apps)</string>
+    <string name="intro_skip">Skip</string>
+    <string name="intro_next">Next</string>
+    <string name="intro_done">Done</string>
 
     <string name="btn_ok">OK</string>
 

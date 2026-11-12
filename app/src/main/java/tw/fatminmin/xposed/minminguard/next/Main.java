@@ -32,6 +32,7 @@ import tw.fatminmin.xposed.minminguard.next.blocker.StatsReporter;
 import tw.fatminmin.xposed.minminguard.next.blocker.UrlFiltering;
 import tw.fatminmin.xposed.minminguard.next.blocker.Util;
 import tw.fatminmin.xposed.minminguard.next.blocker.ViewBlocking;
+import tw.fatminmin.xposed.minminguard.next.core.hook.HookLedger;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.Ad2iction;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.AdMarvel;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.Adbert;
@@ -57,6 +58,8 @@ import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.Fyber;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.GoogleAdmob;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.GoogleGms;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.GoogleGmsDoubleClick;
+import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.GoogleIma;
+import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.HuaweiAds;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.Hodo;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.Inmobi;
 import tw.fatminmin.xposed.minminguard.next.blocker.adnetwork.Intowow;
@@ -114,10 +117,17 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
     private static final Set<String> sHookedProcesses = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 
     public static Blocker[] blockers = {
+            /* Harus paling depan: IMA dan Huawei didahulukan sebelum jaringan
+               lain karena prefix keduanya bertabrakan dengan prefix yang lebih
+               umum. Prefix IMA ("com.google.ads.interactivemedia") berada di
+               dalam prefix GoogleAdmob ("com.google.ads"), dan pencocokan
+               memakai entri pertama yang cocok — bila GoogleAdmob lebih dulu,
+               setiap iklan video IMA dilaporkan sebagai AdMob. */
+            new GoogleIma(), new HuaweiAds(),
             /* Popular adnetwork */
-            new Ad2iction(), new Adbert(), new Adcolony(), new Adfurikun(), new AdMarvel(), new AppodealMRAID(), new GoogleAdmob(), new GoogleGms(), new Adtech(), new Amazon(), new Amobee(),
+            new Ad2iction(), new Adbert(), new Adcolony(), new Adfurikun(), new AdMarvel(), new AppodealMRAID(), new GoogleAdmob(), new GoogleGmsDoubleClick(), new GoogleGms(), new Adtech(), new Amazon(), new Amobee(),
             new Aotter(), new AppBrain(), new Applovin(), new Appnext(), new Avocarrot(), new Bonzai(), new Chartboost(), new Clickforce(), new Domob(), new Facebook(),
-            new Freewheel(), new Flurry(), new Fyber(), new GoogleGmsDoubleClick(), new Hodo(), new Inmobi(), new Intowow(), new Ironsource(), new KuAd(), new mAdserve(), new Madvertise(),
+            new Freewheel(), new Flurry(), new Fyber(), new Hodo(), new Inmobi(), new Intowow(), new Ironsource(), new KuAd(), new mAdserve(), new Madvertise(),
             new MasAd(), new MdotM(), new Millennial(), new Mobclix(), new MobFox(), new MoPub(), new Nend(), new Og(), new Onelouder(), new OpenX(), new SmartAdserver(), new SourcekitMRAID(),
             new Startapp(), new Tapfortap(), new TWMads(), new UnityAds(), new Vpadn(), new Vpon(), new Vungle(), new Waystorm(), new Yandex(),
             /* Jaringan modern: API-based bila signature dikenali, selalu prefix-based */
@@ -157,6 +167,7 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
     private void UnpackResources()
     {
         addPatternsFromAsset("host/output_file");
+        addPatternsFromAsset("host/mmg_extra");
         addPatternsFromAsset("host/mmg_pattern");
     }
 
@@ -339,6 +350,7 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
         ViewBlocking.reset();
         NameBlocking.reset();
         AdCallbacks.reset();
+        HookLedger.get().reset();
 
         try
         {
@@ -372,6 +384,10 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpo
         }
         finally
         {
+            // Modul menyatakan keadaannya sendiri. Satu baris per proses,
+            // selalu ditulis: layer yang mati (mis. seluruh hook kelas
+            // framework pada 3.1.3) tidak lagi senyap.
+            Util.logHookSummary(packageName);
             StatsReporter.get().flushNow();
         }
     }

@@ -5,7 +5,6 @@ import android.view.View;
 import java.lang.reflect.Method;
 
 import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import tw.fatminmin.xposed.minminguard.next.blocker.Blocker;
@@ -27,7 +26,7 @@ public class Onelouder extends Blocker
             return false;
         }
 
-        XposedBridge.hookAllMethods(adView, "setVisibility", new XC_MethodHook()
+        Util.hookAllMethods(adView, "setVisibility", new XC_MethodHook()
         {
             @Override
             protected void beforeHookedMethod(MethodHookParam param)
@@ -57,7 +56,7 @@ public class Onelouder extends Blocker
         final Class<?> interstitial = Util.findClassOrNull(INTERSTITIAL, lpparam.classLoader);
         if (interstitial != null)
         {
-            XposedBridge.hookAllMethods(interstitial, "displayInterstitial", new XC_MethodHook()
+            Util.hookAllMethods(interstitial, "displayInterstitial", new XC_MethodHook()
             {
                 @Override
                 protected void beforeHookedMethod(MethodHookParam param)
@@ -77,7 +76,7 @@ public class Onelouder extends Blocker
     private static void hookHideAdView(Class<?> adView, String methodName, final String packageName,
                                        final Method setVisibility)
     {
-        XposedBridge.hookAllMethods(adView, methodName, new XC_MethodHook()
+        Util.hookAllMethods(adView, methodName, new XC_MethodHook()
         {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable
