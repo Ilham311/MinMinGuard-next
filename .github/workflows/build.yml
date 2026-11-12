@@ -382,11 +382,22 @@ jobs:
 
       - name: Release summary
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.meta.outputs.tag }}
         run: |
           {
             echo "### Rilis $TAG diterbitkan"
             echo
-            gh release view "$TAG" --json url,assets \
-              --jq '"\(.url)\n\n" + (.assets[] | "- \(.name) (\(.size) byte)")'
-          } >> "$GITHUB_STEP_SUMMARY"
+            SUFFIX=""
+            if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+              URL=$(gh release view "$TAG" --json url --jq '.url' 2>/dev/null || true)
+              if [ -n "$URL" ]; then
+                echo "$URL"
+                SUFFIX=" | URL: $URL"
+              fi
+              echo
+              gh release view "$TAG" --json assets \
+                --jq '.assets[] | "- \(.name) (\(.size) byte)"' 2>/dev/null || true
+            fi
+          } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          echo "Rilis $TAG selesai.${SUFFIX:-}"
