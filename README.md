@@ -64,6 +64,35 @@ The release job decodes the keystore into `$RUNNER_TEMP`, verifies the
 resulting APK with `apksigner`, and deletes the keystore afterwards. Pull
 requests build the debug APK only, because secrets are not exposed to them.
 
+### Publishing a release
+
+A push or pull request only uploads a temporary workflow artifact, which expires
+after 30 days and is invisible to users. A **GitHub Release** happens only when
+one of these is true:
+
+- a tag matching `v*` is pushed — the tag must equal `v` + `versionName` in
+  `app/build.gradle` (currently `v4.0.0`), otherwise the publish job fails;
+- the workflow is started manually (`Actions → Build APK → Run workflow`) with
+  **publish_release** checked — the tag `v` + `versionName` is created from the
+  built commit if it does not exist yet.
+
+```bash
+# Release by tag (recommended)
+git tag v4.0.0 && git push origin v4.0.0
+```
+
+The `publish` job attaches three assets to the release:
+
+| Asset | Purpose |
+| --- | --- |
+| `MinMinGuard-next-release.apk` | stable name, always the newest signed build |
+| `MinMinGuard-next-<version>-release.apk` | same file, version-named |
+| `SHA256SUMS.txt` | checksums of both APKs |
+
+Release notes are generated from `git log` since the previous `v*` tag, so keep
+commits readable. Re-running the job for an existing tag replaces the assets and
+the notes instead of failing.
+
 
 ## How it is switched on
 

@@ -3,6 +3,7 @@ name: Build APK
 on:
   push:
     branches: [ master ]
+    tags: [ 'v*' ]
     paths-ignore:
       - '**.md'
       - 'images/**'
@@ -13,10 +14,17 @@ on:
       - 'images/**'
       - 'LICENSE'
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Terbitkan GitHub Release dengan APK release yang ditandatangani'
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Jangan batalkan penerbitan rilis yang sedang berjalan: baik dari tag
+  # maupun dari workflow_dispatch dengan publish_release=true.
+  cancel-in-progress: ${{ github.ref_type != 'tag' && github.event.inputs.publish_release != 'true' }}
 
 permissions:
   contents: read
@@ -200,3 +208,185 @@ jobs:
       - name: Clean up keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/minminguard.keystore"
+
+  # Menerbitkan GitHub Release berisi APK. Dipicu oleh tag `v*` atau manual
+  # (workflow_dispatch dengan publish_release=true). Tanpa job ini workflow
+  # hanya menyimpan artifact sementara dan halaman Releases tetap kosong.
+  publish:
+    name: Publish GitHub Release
+    needs: [ debug, release ]
+    if: >-
+      always()
+      && needs.debug.result == 'success'
+      && needs.release.result == 'success'
+      && (startsWith(github.ref, 'refs/tags/v')
+          || (github.event_name == 'workflow_dispatch'
+              && github.event.inputs.publish_release == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version and tag
+        id: meta
+        run: |
+          set -eu
+          VERSION=$(sed -n 's/.*versionName[[:space:]]*"\([^"]*\)".*/\1/p' app/build.gradle | head -1)
+          VERSION_CODE=$(sed -n 's/.*versionCode[[:space:]]*\([0-9][0-9]*\).*/\1/p' app/build.gradle | head -1)
+          if [ -z "$VERSION" ] || [ -z "$VERSION_CODE" ]; then
+            echo "::error::Could not read versionName/versionCode from app/build.gradle"
+            exit 1
+          fi
+          EXPECTED_TAG="v$VERSION"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            TAG="$GITHUB_REF_NAME"
+            if [ "$TAG" != "$EXPECTED_TAG" ]; then
+              echo "::error::Tag $TAG does not match versionName $VERSION (expected $EXPECTED_TAG)"
+              exit 1
+            fi
+          else
+            TAG="$EXPECTED_TAG"
+            # Dispatch pada branch: kalau tag tujuan sudah menunjuk commit lain,
+            # APK yang baru dibangun tidak mewakili isi tag itu.
+            if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
+              TAG_SHA=$(git rev-list -n1 "refs/tags/$TAG")
+              if [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
+                echo "::error::Tag $TAG already points to $TAG_SHA, not the built commit $GITHUB_SHA. Bump versionName or push the tag instead."
+                exit 1
+              fi
+            fi
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Releasing $TAG (versionCode $VERSION_CODE)"
+
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: MinMinGuard-next-release
+          path: dist
+
+      - name: Prepare assets and checksums
+        run: |
+          set -eu
+          ls -l dist
+          APK="dist/MinMinGuard-next-${{ steps.meta.outputs.version }}-release.apk"
+          if [ ! -f "$APK" ]; then
+            echo "::error::Signed release APK not found: $APK"
+            exit 1
+          fi
+          # Nama stabil supaya tautan unduhan tidak berubah tiap versi.
+          cp "$APK" "dist/MinMinGuard-next-release.apk"
+          ( cd dist && sha256sum -- *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt )
+
+      - name: Write release notes
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          VERSION_CODE: ${{ steps.meta.outputs.version_code }}
+        run: |
+          set -eu
+          NOTES="$RUNNER_TEMP/notes.md"
+          {
+            echo "MinMinGuard-next **$VERSION** (versionCode $VERSION_CODE)."
+            echo
+            echo "## Unduhan"
+            echo
+            echo "- \`MinMinGuard-next-release.apk\` — selalu berkas versi terbaru, bertanda tangan."
+            echo "- \`MinMinGuard-next-$VERSION-release.apk\` — berkas versi ini, isinya sama."
+            echo "- \`SHA256SUMS.txt\` — checksum kedua APK di atas."
+            echo
+            echo "## Pemasangan"
+            echo
+            echo "1. Pasang APK di atas versi sebelumnya (tanda tangan sama, jadi pembaruan biasa)."
+            echo "2. Aktifkan modul di LSPosed, lalu centang aplikasi yang ingin diblokir."
+            echo "3. Reboot perangkat."
+            echo
+            echo "Terdapat satu saklar saja: scope LSPosed. Aplikasi yang tidak dicentang tidak"
+            echo "pernah dimuat oleh modul."
+            echo
+            echo "APK ini dibangun dan ditandatangani oleh CI dari commit tag \`$TAG\`."
+            echo
+            echo "## Perubahan"
+            echo
+            # Titik acuan: tag rilis ini kalau sudah ada (push tag), kalau tidak
+            # commit yang sedang dibangun.
+            if git rev-parse --verify --quiet "$TAG" >/dev/null; then
+              BASE="$TAG"
+              RANGE="$TAG"
+            else
+              BASE="HEAD"
+              RANGE="HEAD"
+            fi
+            PREV=$(git describe --tags --abbrev=0 --match 'v*' "$BASE^" 2>/dev/null || true)
+            if [ -n "$PREV" ]; then
+              RANGE="$PREV..$BASE"
+              echo "Sejak \`$PREV\`:"
+              echo
+              ENTRIES=$(git log --no-merges --pretty='- %s' "$RANGE" 2>/dev/null | head -40 || true)
+              if [ -n "$ENTRIES" ]; then
+                printf '%s\n' "$ENTRIES"
+              else
+                echo "- Tidak ada commit baru."
+              fi
+            else
+              # Rilis pertama: seluruh riwayat commit hanya akan jadi derau.
+              echo "Rilis pertama; lihat bagian \"What changed in $VERSION\" di README"
+              echo "untuk ringkasan perubahannya."
+            fi
+          } > "$NOTES"
+          echo "--- notes ---"
+          cat "$NOTES"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -eu
+          TITLE="MinMinGuard-next $VERSION"
+          NOTES="$RUNNER_TEMP/notes.md"
+          ASSETS=(dist/MinMinGuard-next-release.apk dist/MinMinGuard-next-"$VERSION"-release.apk dist/SHA256SUMS.txt)
+
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            # Tag dari push sudah ada di remote; hanya dispatch yang perlu
+            # dibuatkan tag baru, dan harus menunjuk commit yang dibangun.
+            EXTRA=()
+            if [ "$REF_TYPE" != "tag" ]; then
+              EXTRA=(--target "$GITHUB_SHA")
+            fi
+            if gh release create "$TAG" "${ASSETS[@]}" \
+                 ${EXTRA[@]+"${EXTRA[@]}"} \
+                 --title "$TITLE" \
+                 --notes-file "$NOTES" \
+                 --latest; then
+              echo "Created release $TAG."
+              exit 0
+            fi
+            echo "::warning::Could not create release $TAG (draft or race?); trying to update it instead."
+          fi
+
+          # Sudah ada (job dijalankan ulang): timpa aset dan catatan.
+          echo "Updating existing release $TAG."
+          gh release upload "$TAG" "${ASSETS[@]}" --clobber
+          gh release edit "$TAG" --title "$TITLE" --notes-file "$NOTES" --latest
+
+      - name: Release summary
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          {
+            echo "### Rilis $TAG diterbitkan"
+            echo
+            gh release view "$TAG" --json url,assets \
+              --jq '"\(.url)\n\n" + (.assets[] | "- \(.name) (\(.size) byte)")'
+          } >> "$GITHUB_STEP_SUMMARY"
