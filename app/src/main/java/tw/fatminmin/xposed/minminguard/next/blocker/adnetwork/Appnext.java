@@ -6,6 +6,18 @@ import tw.fatminmin.xposed.minminguard.next.blocker.Blocker;
 
 public class Appnext extends Blocker
 {
+
+    /**
+     * Kelas banner dan prefix paketnya untuk lapisan pemblokiran berbasis nama.
+     * <p>
+     * Sebelumnya keduanya bernilai null, sehingga classifier nama tidak
+     * pernah mengenali view dari SDK ini sama sekali: jaring pengaman yang
+     * seharusnya menangkap iklan ketika signature API bergeser antar versi
+     * SDK tidak pernah berfungsi. Nama kelas diambil dari SDK yang dipakai
+     * aplikasi.
+     */
+    private static final String BANNER = "com.appnext.banners.BannerAd";
+    private static final String BANNER_PREFIX = "com.appnext";
     private static final String INTER_ADS = "com.appnext.ads.interstitial.Interstitial";
 
     private static final String VIDEO_ADS = "com.appnext.ads.fullscreen.";
@@ -27,12 +39,12 @@ public class Appnext extends Blocker
     @Override
     public String getBanner()
     {
-        return null;
+        return BANNER;
     }
 
     @Override
     public String getBannerPrefix()
     {
-        return null;
+        return BANNER_PREFIX;
     }
 }

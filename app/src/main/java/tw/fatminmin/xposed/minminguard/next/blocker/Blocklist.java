@@ -98,6 +98,13 @@ public final class Blocklist
         }
         else
         {
+            // Awalan "www." redundan: isBlockedHost sudah membuangnya sebelum
+            // mencocokkan, jadi "www.example.com" dan "example.com" menunjuk
+            // entri yang sama. Aset bawaan memuat 2.774 duplikat seperti ini.
+            if (line.startsWith("www.") && line.length() > 4)
+            {
+                line = line.substring(4);
+            }
             mHosts.add(line);
         }
     }
@@ -109,7 +116,10 @@ public final class Blocklist
         {
             return;
         }
-        String pattern = raw.trim();
+        // Disimpan sudah lowercase: containsPattern dipanggil per muatan
+        // WebView, dan menurunkan huruf 26 ribu pola pada setiap panggilan
+        // adalah biaya yang tidak perlu.
+        String pattern = raw.trim().toLowerCase(Locale.ROOT);
         if (!pattern.isEmpty() && !pattern.startsWith("#"))
         {
             mResourcePatterns.add(pattern);
@@ -195,7 +205,7 @@ public final class Blocklist
         String lower = text.toLowerCase(Locale.ROOT);
         for (String pattern : mResourcePatterns)
         {
-            if (lower.contains(pattern.toLowerCase(Locale.ROOT)))
+            if (lower.contains(pattern))
             {
                 return true;
             }

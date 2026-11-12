@@ -4,10 +4,12 @@ import android.content.ContentProvider;
 import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.UriMatcher;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
+import android.os.Binder;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -64,6 +66,16 @@ public class MinMinProvider extends ContentProvider
                         @Nullable String selection, @Nullable String[] selectionArgs,
                         @Nullable String sortOrder)
     {
+        // Provider ini exported karena proses aplikasi yang di-hook harus bisa
+        // menulis statistiknya sendiri. Membaca dan menghapus TIDAK perlu
+        // lintas-UID: itu hanya dilakukan UI modul. Tanpa pemeriksaan ini
+        // aplikasi mana pun di perangkat bisa membaca daftar aplikasi yang
+        // dipakai pengguna, atau menghapus seluruh statistiknya.
+        if (!isOwnUid())
+        {
+            return null;
+        }
+
         int match = sMatcher.match(uri);
         SQLiteDatabase db = mDatabase.getReadableDatabase();
 
@@ -159,6 +171,13 @@ public class MinMinProvider extends ContentProvider
     @Override
     public int delete(@NonNull Uri uri, @Nullable String selection, @Nullable String[] selectionArgs)
     {
+        // Hanya UI modul yang boleh menghapus; proses aplikasi ter-hook hanya
+        // menulis delta dan tidak pernah menghapus.
+        if (!isOwnUid())
+        {
+            return 0;
+        }
+
         SQLiteDatabase db = mDatabase.getWritableDatabase();
         int deleted;
 
@@ -204,6 +223,15 @@ public class MinMinProvider extends ContentProvider
             return 0;
         }
 
+        // Penulisan memang lintas-UID (proses aplikasi yang di-hook), tetapi
+        // hanya untuk paketnya sendiri. Tanpa pemeriksaan ini aplikasi jahat
+        // bisa menaikkan/menghapus statistik aplikasi lain atau mendaftarkan
+        // paket yang tidak ada ke daftar "aplikasi dalam scope".
+        if (!mayWritePackage(values.getAsString(Common.KEY_PKG_NAME)))
+        {
+            return 0;
+        }
+
         switch (sMatcher.match(uri))
         {
             case MATCH_STATS:
@@ -215,6 +243,61 @@ public class MinMinProvider extends ContentProvider
             default:
                 return 0;
         }
+    }
+
+    /** {@code true} bila pemanggil adalah proses modul sendiri. */
+    private static boolean isOwnUid()
+    {
+        try
+        {
+            return Binder.getCallingUid() == android.os.Process.myUid();
+        }
+        catch (Throwable t)
+        {
+            // Tanpa Binder (pemanggilan lokal) anggap milik sendiri.
+            return true;
+        }
+    }
+
+    /**
+     * {@code true} bila UID pemanggil memang memiliki paket yang ditulis.
+     * Pemanggilan dari proses modul sendiri selalu diizinkan.
+     */
+    private boolean mayWritePackage(String pkgName)
+    {
+        if (pkgName == null || pkgName.length() == 0)
+        {
+            return false;
+        }
+        if (isOwnUid())
+        {
+            return true;
+        }
+        try
+        {
+            PackageManager pm = getContext() == null ? null : getContext().getPackageManager();
+            if (pm == null)
+            {
+                return false;
+            }
+            int uid = Binder.getCallingUid();
+            String[] owning = pm.getPackagesForUid(uid);
+            if (owning == null)
+            {
+                return false;
+            }
+            for (String pkg : owning)
+            {
+                if (pkgName.equals(pkg))
+                {
+                    return true;
+                }
+            }
+        }
+        catch (Throwable ignored)
+        {
+        }
+        return false;
     }
 
     /**

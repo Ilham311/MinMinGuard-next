@@ -1,7 +1,6 @@
 apply plugin: 'com.android.application'
 
 repositories {
-    maven { url 'https://jitpack.io' }
     mavenCentral()
     google()
 }
@@ -72,22 +71,25 @@ android {
 dependencies {
     compileOnly 'de.robv.android.xposed:api:82'
     compileOnly 'de.robv.android.xposed:api:82:sources'
-    implementation fileTree(include: ['*.jar'], dir: 'libs')
 
     implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
-    implementation 'androidx.cardview:cardview:1.0.0'
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    implementation 'androidx.viewpager2:viewpager2:1.1.0'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
     implementation 'androidx.activity:activity:1.9.3'
     implementation 'com.google.android.material:material:1.12.0'
-    implementation 'com.github.apl-devs:appintro:v4.2.3'
 
-    //Glide
-    implementation 'com.github.bumptech.glide:glide:4.9.0'
-    annotationProcessor 'com.github.bumptech.glide:compiler:4.9.0'
-    annotationProcessor 'androidx.annotation:annotation:1.1.0'
+    // Glide 4.9.0 masih memakai com.android.support di AAR-nya, sehingga
+    // Jetifier tidak bisa dimatikan selama versi itu dipakai. 4.16.0 sudah
+    // AndroidX penuh; API model loader yang dipakai di sini tidak berubah.
+    implementation 'com.github.bumptech.glide:glide:4.16.0'
+    annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
 
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test:runner:1.6.2'
+
+    // Tes JVM untuk logika murni (hook traversal, blocklist, plan jaringan).
+    // Tidak ada tes di sini sampai 4.0.0, dan itulah sebabnya regresi hook
+    // di 3.1.3 bisa lolos ke rilis dengan CI hijau.
+    testImplementation 'junit:junit:4.13.2'
 }

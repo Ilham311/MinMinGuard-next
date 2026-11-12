@@ -190,9 +190,11 @@ public final class UrlFiltering
 
     private static void hookClientMethod(Class<?> clientClass, String methodName, final String packageName)
     {
-        try
-        {
-            XposedBridge.hookAllMethods(clientClass, methodName, new XC_MethodHook()
+        // Lewat Util, bukan XposedBridge.hookAllMethods langsung: versi bridge
+        // hanya melihat getDeclaredMethods() kelas ini dan melempar bila salah
+        // satu overload abstrak, sehingga WebView client turunan (mis. dari
+        // SDK iklan) tidak tersentuh sama sekali.
+        Util.hookAllMethods(clientClass, methodName, new XC_MethodHook()
             {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param)
@@ -232,11 +234,6 @@ public final class UrlFiltering
                     Util.countBlockedAd(null, packageName, "WebView");
                 }
             });
-        }
-        catch (Throwable t)
-        {
-            Util.log(packageName, "hook " + clientClass.getName() + "#" + methodName + " gagal: " + t);
-        }
     }
 
     /** Mengambil URL dari argumen {@code String} atau {@link WebResourceRequest}. */

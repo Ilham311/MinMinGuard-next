@@ -148,10 +148,24 @@ public final class BlockPrefs
                         }
                     }
                 }
-                mUserPrefixes = Collections.unmodifiableList(prefixes);
+                boolean previousHeuristic = mHeuristic;
+                List<String> previousPrefixes = mUserPrefixes;
 
+                mUserPrefixes = Collections.unmodifiableList(prefixes);
                 mHeuristic = mPrefs.getBoolean(Common.KEY_HEURISTIC, true);
                 mVerbose = mPrefs.getBoolean(Common.KEY_VERBOSE_LOG, false);
+
+                // Hasil klasifikasi nama kelas di-cache, dan dua nilai di atas
+                // ikut menentukan hasil itu. Bila berubah, cache lama akan
+                // menjawab dengan aturan yang sudah tidak berlaku sampai proses
+                // aplikasi di-restart — perubahan pengaturan harus langsung
+                // terasa, jadi cache dibuang di sini.
+                if (previousHeuristic != mHeuristic
+                        || previousPrefixes == null
+                        || !previousPrefixes.equals(mUserPrefixes))
+                {
+                    NameBlocking.invalidateCache();
+                }
             }
             catch (Throwable t)
             {

@@ -29,6 +29,27 @@ public class ViewBlocking
     private static final Map<View, Boolean> sProcessed =
             Collections.synchronizedMap(new WeakHashMap<View, Boolean>());
 
+    /**
+     * Menandai view pernah diproses dan melaporkan apakah ini yang pertama.
+     * <p>
+     * Dipakai sebagai gerbang pencatatan statistik per jaringan. Sebelum ini
+     * {@code NameBlocking.isAdView} mencatat sendiri setiap kali dipanggil,
+     * padahal satu banner yang lewat {@code inflate} lalu {@code addView}
+     * melewatinya dua kali — rincian per-jaringan di dialog statistik
+     * membengkak dua kali lipat. Penanda ini sudah ada untuk {@code removeAdView},
+     * jadi memakainya di sini menyatukan sumber kebenarannya.
+     *
+     * @return {@code true} bila view ini belum pernah diproses
+     */
+    public static boolean markSeen(View view)
+    {
+        if (view == null)
+        {
+            return false;
+        }
+        return sProcessed.put(view, Boolean.TRUE) == null;
+    }
+
     public static void removeAdView(String packageName, View view)
     {
         if (view == null)
@@ -36,7 +57,7 @@ public class ViewBlocking
             return;
         }
 
-        if (sProcessed.put(view, Boolean.TRUE) != null)
+        if (!markSeen(view))
         {
             // Sudah pernah diblokir; cukup pastikan tingginya nol.
             collapse(view);

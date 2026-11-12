@@ -28,6 +28,16 @@ import tw.fatminmin.xposed.minminguard.next.blocker.Blocker;
  */
 public class Vungle extends Blocker
 {
+
+    /**
+     * Prefix paket untuk lapisan pemblokiran berbasis nama.
+     * <p>
+     * Sebelumnya {@code getBanner()}/{@code getBannerPrefix()} sama-sama
+     * {@code null}, sehingga classifier nama tidak pernah mengenali view
+     * Vungle. {@link #BANNER_VIEW} sudah ada untuk hook API dan dipakai ulang
+     * di sini agar tidak ada dua konstanta berisi nama kelas yang sama.
+     */
+    private static final String BANNER_PREFIX = "com.vungle";
     private static final String BASE_AD = "com.vungle.ads.BaseAd";
     private static final String BASE_FULLSCREEN = "com.vungle.ads.BaseFullscreenAd";
     private static final String BANNER_VIEW = "com.vungle.ads.VungleBannerView";
@@ -80,12 +90,12 @@ public class Vungle extends Blocker
     @Override
     public String getBanner()
     {
-        return null;
+        return BANNER_VIEW;
     }
 
     @Override
     public String getBannerPrefix()
     {
-        return null;
+        return BANNER_PREFIX;
     }
 }

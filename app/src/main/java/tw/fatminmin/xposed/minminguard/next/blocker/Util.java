@@ -15,6 +15,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
+import tw.fatminmin.xposed.minminguard.next.core.hook.HierarchyWalk;
+import tw.fatminmin.xposed.minminguard.next.core.hook.HookLedger;
+import tw.fatminmin.xposed.minminguard.next.core.hook.HookResult;
 
 /**
  * Utilitas yang dipakai di dalam proses aplikasi yang di-hook.
@@ -162,6 +165,36 @@ public final class Util
     }
 
     /**
+     * Menulis ringkasan pemasangan hook ke log framework.
+     * <p>
+     * Inilah "modul melaporkan keadaannya sendiri": setiap layer menyebut
+     * berapa overload terpasang dan berapa yang gagal. Tanpa baris ini, layer
+     * yang mati (seperti seluruh hook kelas framework pada 3.1.3) hanya bisa
+     * diketahui dengan menguji satu per satu di perangkat.
+     * <p>
+     * Ditulis selalu, bukan hanya saat verbose, karena ini satu baris per
+     * proses dan justru dibutuhkan ketika something is wrong.
+     */
+    public static void logHookSummary(String pkgName)
+    {
+        try
+        {
+            warn("hook [" + pkgName + "]: " + HookLedger.get().summary());
+            if (HookLedger.get().hasAttentionFailures())
+            {
+                for (HookResult failure : HookLedger.get().failures())
+                {
+                    warn("hook gagal [" + pkgName + "]: " + failure
+                            + (failure.error == null ? "" : " (" + failure.error + ")"));
+                }
+            }
+        }
+        catch (Throwable ignored)
+        {
+        }
+    }
+
+    /**
      * Mencari kelas sekali per ClassLoader; hasil negatif di-cache.
      *
      * @return kelas, atau {@code null} bila tidak ada di ClassLoader tersebut.
@@ -208,6 +241,51 @@ public final class Util
      */
     public static boolean hookAllMethods(String className, ClassLoader classLoader, String method, XC_MethodHook callback)
     {
+        return hookAllMethods(layerFor(className), className, classLoader, method, callback);
+    }
+
+    /**
+     * Seperti {@link #hookAllMethods(String, ClassLoader, String, XC_MethodHook)},
+     * tetapi mencatat hasilnya pada layer yang ditentukan.
+     */
+    public static boolean hookAllMethods(HookResult.Layer layer, String className, ClassLoader classLoader,
+                                         String method, XC_MethodHook callback)
+    {
+        Class<?> clazz = findClassOrNull(className, classLoader);
+        if (clazz == null)
+        {
+            HookLedger.get().record(HookResult.missingClass(layer, className, method));
+            return false;
+        }
+        return installHierarchy(layer, className, clazz, method, callback);
+    }
+
+    /**
+     * Versi yang sudah memegang objek {@code Class}.
+     * <p>
+     * Beberapa blocker menemukan kelasnya sendiri lewat
+     * {@link #findClassOrNull} lalu memanggil
+     * {@code XposedBridge.hookAllMethods} langsung. Jalur itu melewati seluruh
+     * perbaikan di sini: hanya {@code getDeclaredMethods()} yang terlihat,
+     * method warisan tidak pernah ter-hook, method abstrak membatalkan sisa
+     * overload, dan kegagalannya tidak tercatat di ledger — persis penyebab
+     * regresi 3.1.3. Overload ini menutup jalur tersebut tanpa memaksa
+     * pemanggil menghitung ulang nama kelas.
+     */
+    public static boolean hookAllMethods(Class<?> clazz, String method, XC_MethodHook callback)
+    {
+        if (clazz == null)
+        {
+            return false;
+        }
+        String className = clazz.getName();
+        return installHierarchy(layerFor(className), className, clazz, method, callback);
+    }
+
+    /** Inti pemasangan: dedupe, penelusuran hierarki, dan pencatatan ke ledger. */
+    private static boolean installHierarchy(HookResult.Layer layer, String className, Class<?> clazz,
+                                            String method, XC_MethodHook callback)
+    {
         String key = className + "#" + method + "@" + System.identityHashCode(callback);
         if (!sHookedMethods.add(key))
         {
@@ -218,13 +296,6 @@ public final class Util
 
         try
         {
-            Class<?> clazz = findClassOrNull(className, classLoader);
-            if (clazz == null)
-            {
-                sHookedMethods.remove(key);
-                return false;
-            }
-
             // XposedBridge.hookAllMethods hanya melihat getDeclaredMethods()
             // pada kelas yang diberikan. Method warisan karena itu tidak pernah
             // ter-hook: setAdListener pada AdView dideklarasikan di BaseAdView,
@@ -242,14 +313,69 @@ public final class Util
             // IronSourceAdapter menimpa 11 method AbstractAdapter, dan
             // AdManagerInterstitialAd menimpa InterstitialAd#load. Kelas-kelas
             // seperti itu didaftarkan eksplisit di blocker masing-masing.
-            return hookHierarchy(clazz, method, callback);
+            int hookedCount = hookHierarchy(clazz, method, callback);
+
+            if (hookedCount == 0)
+            {
+                sHookedMethods.remove(key);
+
+                // Bedakan dua kondisi yang dulu sama-sama senyap:
+                //  - method memang tidak ada (mis. getByNameOnNet di bawah
+                //    Android 8, atau SDK versi lain): normal, jangan berisik;
+                //  - method ADA tetapi tidak satu pun overload terpasang:
+                //    selalu bug atau SDK berubah, dan wajib terlihat.
+                if (methodNamesInHierarchy(clazz).contains(method))
+                {
+                    HookLedger.get().record(HookResult.failed(layer, className, method, null));
+                    warn("hook gagal: " + className + "#" + method
+                            + " (method ada, tidak ada overload yang bisa di-hook)");
+                }
+                else
+                {
+                    HookLedger.get().record(HookResult.missingMethod(layer, className, method));
+                }
+                return false;
+            }
+
+            HookLedger.get().record(HookResult.installed(layer, className, method, hookedCount));
+            return true;
         }
         catch (Throwable t)
         {
             sHookedMethods.remove(key);
+            HookLedger.get().record(HookResult.failed(layer, className, method, t));
             log("mmg", "hookAllMethods " + className + "#" + method + " gagal: " + t);
             return false;
         }
+    }
+
+    /**
+     * Layer pemblokiran berdasarkan nama kelas.
+     * <p>
+     * Pemanggil lama tidak perlu tahu soal layer; nama kelas sudah cukup untuk
+     * mengelompokkan diagnostik dengan benar.
+     */
+    public static HookResult.Layer layerFor(String className)
+    {
+        if (className == null)
+        {
+            return HookResult.Layer.SDK_API;
+        }
+        if (className.startsWith("android.webkit."))
+        {
+            return HookResult.Layer.WEBVIEW;
+        }
+        if (className.startsWith("java.net.") || className.startsWith("android.net."))
+        {
+            return HookResult.Layer.DNS;
+        }
+        if (className.startsWith("android.app.Activity")
+                || className.startsWith("android.view.")
+                || className.startsWith("android.widget."))
+        {
+            return HookResult.Layer.NAME;
+        }
+        return HookResult.Layer.SDK_API;
     }
 
     /**
@@ -272,65 +398,38 @@ public final class Util
      * {@code getDeclaredMethods()} pada kelas framework adalah panggilan
      * refleksi mahal sekaligus berisiko memasang hook di luar cakupan modul.
      *
-     * @return {@code true} bila minimal satu overload terpasang
+     * @return jumlah overload yang terpasang; {@code 0} berarti gagal
      */
-    private static boolean hookHierarchy(Class<?> clazz, String methodName, XC_MethodHook callback)
+    private static int hookHierarchy(Class<?> clazz, String methodName, XC_MethodHook callback)
     {
-        boolean hooked = false;
-        // Signature yang sudah ditangani oleh kelas turunan, supaya deklarasi
-        // yang ditimpa di kelas dasar tidak di-hook dua kali.
-        Set<String> handled = new java.util.HashSet<>();
-        Class<?> current = clazz;
+        int hooked = 0;
 
-        for (int depth = 0; current != null && depth < 8; depth++)
+        // Pemilihan overload (termasuk aturan berhenti di leluhur bootstrap)
+        // ada di HierarchyWalk yang diuji di JVM. Versi sebelumnya memeriksa
+        // ClassLoader kelas AWAL dan berhenti di depth 0 untuk kelas framework,
+        // sehingga addView/setContentView/inflate/WebView/InetAddress tidak
+        // pernah ter-hook sama sekali pada 3.1.3.
+        for (Method method : HierarchyWalk.collect(clazz, methodName))
         {
-            ClassLoader loader = current.getClassLoader();
-            if (loader == null)
+            String declaring = method.getDeclaringClass().getName();
+            String key = declaring + "#" + HierarchyWalk.signature(method)
+                    + "@" + callback.getClass().getName();
+            if (!sHookedMembers.add(key))
             {
-                // Kelas framework dimuat bootstrap; tidak relevan untuk SDK iklan.
-                break;
+                // Callback sejenis sudah terpasang pada deklarasi ini.
+                hooked++;
+                continue;
             }
-
             try
             {
-                for (Method method : current.getDeclaredMethods())
-                {
-                    if (!method.getName().equals(methodName))
-                    {
-                        continue;
-                    }
-                    String signature = signatureOf(method);
-                    if (!handled.add(signature))
-                    {
-                        // Sudah ditangani deklarasi di kelas turunan.
-                        continue;
-                    }
-                    if (java.lang.reflect.Modifier.isAbstract(method.getModifiers()))
-                    {
-                        continue;
-                    }
-                    if (!sHookedMembers.add(current.getName() + "#" + signature
-                            + "@" + callback.getClass().getName()))
-                    {
-                        hooked = true;
-                        continue;
-                    }
-                    try
-                    {
-                        XposedBridge.hookMethod(method, callback);
-                        hooked = true;
-                    }
-                    catch (Throwable t)
-                    {
-                        log("mmg", "hookMethod " + current.getName() + "#" + methodName + " gagal: " + t);
-                    }
-                }
+                XposedBridge.hookMethod(method, callback);
+                hooked++;
             }
-            catch (Throwable ignored)
+            catch (Throwable t)
             {
+                sHookedMembers.remove(key);
+                log("mmg", "hookMethod " + declaring + "#" + methodName + " gagal: " + t);
             }
-
-            current = current.getSuperclass();
         }
 
         return hooked;
@@ -358,26 +457,7 @@ public final class Util
         {
             return cached;
         }
-        Set<String> names = new java.util.HashSet<>();
-        Class<?> current = clazz;
-        for (int depth = 0; current != null && depth < 8; depth++)
-        {
-            if (current.getClassLoader() == null)
-            {
-                break;
-            }
-            try
-            {
-                for (Method method : current.getDeclaredMethods())
-                {
-                    names.add(method.getName());
-                }
-            }
-            catch (Throwable ignored)
-            {
-            }
-            current = current.getSuperclass();
-        }
+        Set<String> names = new java.util.HashSet<>(HierarchyWalk.names(clazz));
         sMethodNames.put(clazz, names);
         return names;
     }
@@ -385,23 +465,6 @@ public final class Util
     /** Hasil {@link #methodNamesInHierarchy} per kelas. */
     private static final Map<Class<?>, Set<String>> sMethodNames =
             Collections.synchronizedMap(new WeakHashMap<Class<?>, Set<String>>());
-
-    /** Nama method beserta tipe parameternya, untuk mencocokkan overload. */
-    private static String signatureOf(Method method)    {
-        StringBuilder builder = new StringBuilder(method.getName());
-        builder.append('(');
-        Class<?>[] types = method.getParameterTypes();
-        for (int i = 0; i < types.length; i++)
-        {
-            if (i > 0)
-            {
-                builder.append(',');
-            }
-            builder.append(types[i].getName());
-        }
-        builder.append(')');
-        return builder.toString();
-    }
 
     /**
      * Method yang hanya <em>melaporkan status</em> ({@code isReady},
@@ -497,17 +560,31 @@ public final class Util
     public static boolean hookMethod(String className, ClassLoader classLoader, String method,
                                      Object[] parameterTypesAndCallback)
     {
+        return hookMethod(layerFor(className), className, classLoader, method, parameterTypesAndCallback);
+    }
+
+    /**
+     * Versi {@link #hookMethod} yang mencatat hasilnya pada layer tertentu.
+     * Dipakai hook {@code Activity#onCreate} agar masuk ke layer ACTIVITY,
+     * bukan NAME.
+     */
+    public static boolean hookMethod(HookResult.Layer layer, String className, ClassLoader classLoader,
+                                     String method, Object[] parameterTypesAndCallback)
+    {
         if (findClassOrNull(className, classLoader) == null)
         {
+            HookLedger.get().record(HookResult.missingClass(layer, className, method));
             return false;
         }
         try
         {
             XposedHelpers.findAndHookMethod(className, classLoader, method, parameterTypesAndCallback);
+            HookLedger.get().record(HookResult.installed(layer, className, method, 1));
             return true;
         }
         catch (Throwable t)
         {
+            HookLedger.get().record(HookResult.failed(layer, className, method, t));
             log("mmg", "hookMethod " + className + "#" + method + " gagal: " + t);
             return false;
         }

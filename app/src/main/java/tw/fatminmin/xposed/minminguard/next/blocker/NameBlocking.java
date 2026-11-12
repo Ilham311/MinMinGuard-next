@@ -4,9 +4,13 @@ import android.app.Activity;
 import android.view.View;
 import android.view.ViewGroup;
 
+import java.util.List;
+
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import tw.fatminmin.xposed.minminguard.next.Main;
+import tw.fatminmin.xposed.minminguard.next.core.name.AdNameMatcher;
+import tw.fatminmin.xposed.minminguard.next.core.name.NameCache;
 
 /**
  * Pemblokiran berbasis nama kelas view.
@@ -27,6 +31,7 @@ public final class NameBlocking
             "AdView", "AdViewGroup", "AdContainer", "AdLayout", "AdWrapper",
             "BannerView", "BannerLayout", "NativeAdView", "NativeAdLayout",
             "InterstitialAdView", "AdFrameLayout", "AdRelativeLayout",
+            "AdWebView", "RewardedAdView", "AppOpenAdView",
     };
 
     /** Prefix yang bukan iklan meskipun mengandung kata "ad". */
@@ -34,6 +39,15 @@ public final class NameBlocking
             "android.", "androidx.", "com.android.", "java.", "kotlin.",
             "com.google.android.material.",
     };
+
+    /**
+     * Hasil klasifikasi per kelas.
+     * <p>
+     * Ini yang membuat lapisan nama layak dipakai: tanpa cache, view biasa
+     * menempuh 61 pemblokir × 2 panggilan virtual pada SETIAP addView.
+     * Lihat {@link NameCache} untuk rinciannya.
+     */
+    private static final NameCache sCache = new NameCache();
 
     private NameBlocking() throws InstantiationException
     {
@@ -50,9 +64,16 @@ public final class NameBlocking
     }
 
     /**
+     * Klasifikasi nama kelas <em>tanpa</em> efek samping.
+     * <p>
+     * Versi sebelumnya mencatat statistik di dalam {@link #isAdView}, sehingga
+     * satu banner yang lewat {@code inflate} lalu {@code addView} terhitung
+     * dua kali. Pencatatan sekarang dilakukan pemanggil, sekali, setelah
+     * {@link ViewBlocking} menyatakan view itu memang baru.
+     *
      * @return nama jaringan iklan, atau {@code null} bila view bukan iklan.
      */
-    public static String classify(String className)
+    public static String classifyOnly(String className)
     {
         if (className == null)
         {
@@ -67,8 +88,12 @@ public final class NameBlocking
             }
         }
 
-        // Kasus khusus: SDK lama Google.
-        if (className.startsWith("com.google.ads."))
+        // Kasus khusus: SDK lama Google. Pemeriksaan ini HARUS melewati IMA
+        // lebih dulu, karena prefix-nya berada di dalam "com.google.ads" dan
+        // tanpa pengecualian ini setiap kelas iklan video IMA dilaporkan
+        // sebagai AdMob.
+        if (className.startsWith("com.google.ads.")
+                && !className.startsWith("com.google.ads.interactivemedia"))
         {
             return "GoogleAdmob";
         }
@@ -93,13 +118,10 @@ public final class NameBlocking
 
         if (BlockPrefs.get().isHeuristicEnabled())
         {
-            String simple = simpleName(className);
-            for (String suffix : HEURISTIC_SUFFIXES)
+            String simple = AdNameMatcher.simpleName(className);
+            if (AdNameMatcher.matchesAnySuffix(simple, HEURISTIC_SUFFIXES))
             {
-                if (endsWithWord(simple, suffix))
-                {
-                    return "Heuristic";
-                }
+                return "Heuristic";
             }
         }
 
@@ -107,47 +129,58 @@ public final class NameBlocking
     }
 
     /**
-     * Pencocokan akhiran pada batas kata.
-     * <p>
-     * Tanpa ini {@code HeadView} ikut cocok dengan akhiran {@code AdView}
-     * (huruf "ad" di tengah kata) dan view aplikasi biasa ikut dihapus.
+     * Seperti {@link #classifyOnly} tetapi memakai cache per kelas.
+     *
+     * @return nama jaringan, string kosong bila sudah diperiksa dan bukan
+     *         iklan, atau {@code null} bila belum diketahui
      */
-    private static boolean endsWithWord(String simple, String suffix)
+    private static String classifyCached(Class<?> type)
     {
-        if (simple.equals(suffix))
+        String cached = sCache.lookup(type);
+        if (cached != null)
         {
-            return true;
+            return cached;
         }
-        if (!simple.endsWith(suffix) || simple.length() <= suffix.length())
+        String network = classifyOnly(type.getName());
+        sCache.put(type, network);
+        return network;
+    }
+
+    /**
+     * Memeriksa apakah view ini container iklan, <em>tanpa</em> mengubah
+     * statistik.
+     */
+    public static boolean isAdView(View view)
+    {
+        if (view == null)
         {
             return false;
         }
-        char before = simple.charAt(simple.length() - suffix.length() - 1);
-        return Character.isUpperCase(before) || Character.isDigit(before);
+        String network = classifyCached(view.getClass());
+        return network != null && !network.isEmpty();
     }
 
-    private static String simpleName(String className)
-    {
-        int dot = className.lastIndexOf('.');
-        String simple = dot >= 0 ? className.substring(dot + 1) : className;
-        int dollar = simple.lastIndexOf('$');
-        return dollar >= 0 ? simple.substring(dollar + 1) : simple;
-    }
-
+    /**
+     * Memeriksa dan mencatat bila view ini iklan.
+     * <p>
+     * Pencatatan hanya terjadi di sini, dan pemanggil memanggilnya sekali per
+     * view berkat {@link ViewBlocking#markSeen}.
+     */
     public static boolean isAdView(String pkgName, View view)
     {
         if (view == null)
         {
             return false;
         }
-
-        String network = classify(view.getClass().getName());
-        if (network == null)
+        String network = classifyCached(view.getClass());
+        if (network == null || network.isEmpty())
         {
             return false;
         }
-
-        Util.countBlockedAd(view.getContext(), pkgName, network);
+        if (ViewBlocking.markSeen(view))
+        {
+            Util.countBlockedAd(view.getContext(), pkgName, network);
+        }
         return true;
     }
 
@@ -167,6 +200,9 @@ public final class NameBlocking
             return;
         }
 
+        // isAdView(String, View) hanya mencatat bila view belum pernah dilihat,
+        // jadi penelusuran berulang pada pohon yang sama tidak menggelembungkan
+        // statistik.
         if (isAdView(packageName, view))
         {
             ViewBlocking.removeAdView(packageName, view);
@@ -290,5 +326,46 @@ public final class NameBlocking
     public static void reset()
     {
         sScannedTrees.clear();
+        sCache.invalidate();
+    }
+
+    /**
+     * Membuang cache klasifikasi karena preferensi berubah.
+     * <p>
+     * Prefix tambahan pengguna dan sakelar heuristik ikut memengaruhi hasil,
+     * jadi cache harus kosong. Dipanggil dari dialog pengaturan setelah nilai
+     * disimpan.
+     */
+    public static void invalidateCache()
+    {
+        sCache.invalidate();
+    }
+
+    /** Jumlah kelas yang sudah diklasifikasikan; dipakai tes dan diagnostik. */
+    public static int cachedClassCount()
+    {
+        return sCache.size();
+    }
+
+    /** Nama jaringan untuk nama kelas apa pun, memakai cache. */
+    public static String networkForClass(Class<?> type)
+    {
+        String value = classifyCached(type);
+        return value == null || value.isEmpty() ? null : value;
+    }
+
+    /** Membuang satu kelas dari cache; dipakai tes. */
+    static void evict(Class<?> type)
+    {
+        if (type != null)
+        {
+            sCache.put(type, null);
+        }
+    }
+
+    /** Daftar akhiran heuristik; dipakai tes agar aset dan kode tidak menyimpang. */
+    static List<String> heuristicSuffixes()
+    {
+        return java.util.Arrays.asList(HEURISTIC_SUFFIXES);
     }
 }

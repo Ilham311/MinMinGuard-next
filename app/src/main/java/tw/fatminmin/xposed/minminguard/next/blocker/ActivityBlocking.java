@@ -9,6 +9,7 @@ import java.util.List;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
+import tw.fatminmin.xposed.minminguard.next.core.hook.HookResult;
 
 /**
  * Menutup aktivitas interstitial / full screen milik SDK iklan sebelum
@@ -116,7 +117,7 @@ public final class ActivityBlocking
 
     public static void blockInterstitialActivities(final String packageName, final XC_LoadPackage.LoadPackageParam lpparam)
     {
-        Util.hookMethod("android.app.Activity", lpparam.classLoader, "onCreate", new Object[]{
+        Util.hookMethod(HookResult.Layer.ACTIVITY, "android.app.Activity", lpparam.classLoader, "onCreate", new Object[]{
                 Bundle.class,
                 new XC_MethodHook()
                 {

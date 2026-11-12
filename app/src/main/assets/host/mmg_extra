@@ -1,0 +1,55 @@
+# Host SDK iklan yang didukung modul ini tetapi tidak ada di output_file.
+#
+# Sebelum entri ini, delapan SDK besar punya blocker API tetapi NOL entri di
+# daftar host: layer DNS dan WebView tidak punya amunisi untuk mereka.
+# Satu host per baris, lowercase, tanpa awalan www. dan tanpa wildcard.
+#
+# Diperiksa 2026-11; tambahkan induk domain (bukan host iklan spesifik) agar
+# perubahan subdomain di sisi SDK tidak membuat entri usang.
+
+# AppLovin / MAX
+applovin.com
+applovin.cn
+
+# ironSource / LevelPlay
+ironsrc.com
+supersonicads.com
+unity3d.com
+
+# Mintegral / Mobvista
+mbridge.com
+mintegral.com
+mobvista.com
+
+# Pangle / ByteDance
+pangle.io
+byteoversea.com
+bytedance.com
+pglstatp-toutiao.com
+
+# Vungle / Liftoff
+vungle.com
+vungle.akamaihd.net
+
+# StartApp
+startappservice.com
+startapp.com
+
+# Unity Ads
+unityads.unity3d.com
+
+# Tencent GDT / TopOn / TradPlus / Tapjoy
+gdt.qq.com
+anythinktech.com
+tradplus.ads
+tapjoy.com
+
+# Google IMA (Interactive Media Ads) untuk iklan video pre-roll/mid-roll.
+# Host ini diambil dari bytecode AAR resmi interactivemedia 3.40.0, bukan dari
+# dokumentasi. Hanya imasdk.googleapis.com yang perlu ditambahkan di sini:
+# tujuan permintaan iklannya (googleads.g.doubleclick.net dan
+# pubads.g.doubleclick.net) sudah ada di output_file.
+imasdk.googleapis.com
+
+# AdMob / Ad Manager. googleadservices.com sudah ada di output_file, jadi
+# tidak diulang di sini.

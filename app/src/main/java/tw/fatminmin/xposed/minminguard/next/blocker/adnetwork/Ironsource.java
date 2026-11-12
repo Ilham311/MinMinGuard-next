@@ -6,6 +6,18 @@ import tw.fatminmin.xposed.minminguard.next.blocker.Blocker;
 
 public class Ironsource extends Blocker
 {
+
+    /**
+     * Kelas banner dan prefix paketnya untuk lapisan pemblokiran berbasis nama.
+     * <p>
+     * Sebelumnya keduanya bernilai null, sehingga classifier nama tidak
+     * pernah mengenali view dari SDK ini sama sekali: jaring pengaman yang
+     * seharusnya menangkap iklan ketika signature API bergeser antar versi
+     * SDK tidak pernah berfungsi. Nama kelas diambil dari SDK yang dipakai
+     * aplikasi.
+     */
+    private static final String BANNER = "com.ironsource.mediationsdk.ads.banner.LevelPlayBannerAdView";
+    private static final String BANNER_PREFIX = "com.ironsource";
     /**
      * Kelas lama tidak dipakai lagi: {@code SupersonicAdsAdapter} tidak ada di
      * SDK ironSource modern, sehingga seluruh hook pada kelas itu tidak pernah
@@ -113,12 +125,12 @@ public class Ironsource extends Blocker
     @Override
     public String getBanner()
     {
-        return null;
+        return BANNER;
     }
 
     @Override
     public String getBannerPrefix()
     {
-        return null;
+        return BANNER_PREFIX;
     }
 }

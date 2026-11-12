@@ -2,7 +2,6 @@ package tw.fatminmin.xposed.minminguard.next.blocker.custom_mod;
 
 import android.view.View;
 import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import tw.fatminmin.xposed.minminguard.next.blocker.Util;
 
@@ -27,7 +26,7 @@ public final class _2chMate
             return false;
         }
 
-        XposedBridge.hookAllMethods(viewGroupClass, "addView", new XC_MethodHook()
+        Util.hookAllMethods(viewGroupClass, "addView", new XC_MethodHook()
         {
             @Override
             protected void beforeHookedMethod(MethodHookParam param)

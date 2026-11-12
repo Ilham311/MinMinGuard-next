@@ -3,7 +3,6 @@ package tw.fatminmin.xposed.minminguard.next.blocker.adnetwork;
 import android.view.View;
 
 import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 import tw.fatminmin.xposed.minminguard.next.blocker.Blocker;
 import tw.fatminmin.xposed.minminguard.next.blocker.Util;
@@ -29,7 +28,7 @@ public class Og extends Blocker
             return false;
         }
 
-        XposedBridge.hookAllMethods(webView, "loadUrl", new XC_MethodHook()
+        Util.hookAllMethods(webView, "loadUrl", new XC_MethodHook()
         {
             @Override
             protected void beforeHookedMethod(MethodHookParam param)
