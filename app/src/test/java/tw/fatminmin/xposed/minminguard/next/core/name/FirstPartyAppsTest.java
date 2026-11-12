@@ -60,6 +60,76 @@ public class FirstPartyAppsTest
     }
 
     @Test
+    public void michatOwnBannerViewsAreExcludedFromNameLayer()
+    {
+        // Dari jejak crash di perangkat (LSPosed verbose log):
+        //   MinMinGuard [com.michatapp.im] addView:
+        //       com.zenmen.palmchat.ui.widget.FeedBottomBannerView
+        //   2 ms kemudian:
+        //   NullPointerException ... setVisibility(int) on a null object
+        //       at com.zenmen.palmchat.photoview.PhotoViewActivity.D1:139
+        // dan pada proses lain:
+        //   com.michatapp.ad.view.MeTabBannerAdView -> SettingsFragment:312.
+        // Kedua kelas milik aplikasi sendiri, dipakai ulang lewat
+        // findViewById. Menghapusnya dari pohon view mematikan aplikasi.
+        String feedBanner = "com.zenmen.palmchat.ui.widget.FeedBottomBannerView";
+        String tabBanner = "com.michatapp.ad.view.MeTabBannerAdView";
+
+        assertTrue("prasyarat: nama ini cocok dengan akhiran BannerView",
+                AdNameMatcher.matchesAnySuffix(
+                        AdNameMatcher.simpleName(feedBanner), HEURISTIC));
+        assertTrue("prasyarat: nama ini cocok dengan akhiran AdView",
+                AdNameMatcher.matchesAnySuffix(
+                        AdNameMatcher.simpleName(tabBanner), HEURISTIC));
+
+        assertTrue(FirstPartyApps.isFirstParty("com.michatapp.im"));
+        assertTrue(FirstPartyApps.ownsClass("com.michatapp.im", feedBanner));
+        assertTrue(FirstPartyApps.ownsClass("com.michatapp.im", tabBanner));
+
+        // SDK iklan yang dipakai MiChat tetap disaring.
+        assertFalse(FirstPartyApps.ownsClass("com.michatapp.im",
+                "com.google.android.gms.ads.AdView"));
+        assertFalse(FirstPartyApps.ownsClass("com.michatapp.im",
+                "com.ironsource.mediationsdk.IronSource"));
+    }
+
+    @Test
+    public void capcutBannerViewIsExcludedFromNameLayer()
+    {
+        // Dari crash nyata: com.vega.ui.banner.BannerView dihapus oleh hook
+        // addView, lalu BannerCardViewHolder.t0 melempar
+        // "java.lang.NullPointerException: must not be null" saat bind.
+        // CapCut menaruh kodenya di com.vega.*, bukan di applicationId
+        // com.lemon.lvoverseas.
+        String banner = "com.vega.ui.banner.BannerView";
+
+        assertTrue("prasyarat: nama ini cocok dengan akhiran BannerView",
+                AdNameMatcher.matchesAnySuffix(
+                        AdNameMatcher.simpleName(banner), HEURISTIC));
+
+        assertTrue(FirstPartyApps.isFirstParty("com.lemon.lvoverseas"));
+        assertTrue(FirstPartyApps.ownsClass("com.lemon.lvoverseas", banner));
+
+        // SDK iklan CapCut tetap disaring: Pangle, GMS, AppLovin, Mintegral.
+        assertFalse(FirstPartyApps.ownsClass("com.lemon.lvoverseas",
+                "com.bytedance.sdk.openadsdk.api.banner.PAGBannerAd"));
+        assertFalse(FirstPartyApps.ownsClass("com.lemon.lvoverseas",
+                "com.google.android.gms.ads.AdView"));
+    }
+
+    @Test
+    public void capcutAndMichatCodeNamespacesDoNotOverlapTheApplicationId()
+    {
+        // Pelajaran yang sama seperti Instagram/YouTube: kode aplikasi jarang
+        // berada tepat di bawah applicationId.
+        assertFalse(AdNameMatcher.belongsToApp("com.vega.ui.banner.BannerView",
+                FirstPartyApps.namespacesOf("com.michatapp.im")));
+        assertFalse(AdNameMatcher.belongsToApp(
+                "com.zenmen.palmchat.ui.widget.FeedBottomBannerView",
+                FirstPartyApps.namespacesOf("com.lemon.lvoverseas")));
+    }
+
+    @Test
     public void applicationsWithoutFirstPartyAdsAreNotExcluded()
     {
         // Aplikasi lain tetap memakai heuristik penuh — jangan dilonggarkan.

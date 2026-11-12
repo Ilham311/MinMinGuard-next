@@ -9,6 +9,7 @@ import java.util.List;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import tw.fatminmin.xposed.minminguard.next.Main;
+import tw.fatminmin.xposed.minminguard.next.core.name.AdClassification;
 import tw.fatminmin.xposed.minminguard.next.core.name.AdNameMatcher;
 import tw.fatminmin.xposed.minminguard.next.core.name.FirstPartyApps;
 import tw.fatminmin.xposed.minminguard.next.core.name.NameCache;
@@ -34,6 +35,15 @@ public final class NameBlocking
             "InterstitialAdView", "AdFrameLayout", "AdRelativeLayout",
             "AdWebView", "RewardedAdView", "AppOpenAdView",
     };
+
+    /**
+     * Nama jaringan untuk hasil yang hanya berasal dari heuristik.
+     * <p>
+     * Bedanya penting: kelas SDK punya bukti (ada di daftar pemblokir yang
+     * memang khusus iklan), sedangkan hasil heuristik hanya tebakan dari nama.
+     * Lihat {@link AdClassification} untuk akibatnya pada penanganan view.
+     */
+    static final String HEURISTIC_NETWORK = AdClassification.HEURISTIC;
 
     /** Prefix yang bukan iklan meskipun mengandung kata "ad". */
     private static final String[] IGNORED_PREFIXES = {
@@ -122,7 +132,7 @@ public final class NameBlocking
             String simple = AdNameMatcher.simpleName(className);
             if (AdNameMatcher.matchesAnySuffix(simple, HEURISTIC_SUFFIXES))
             {
-                return "Heuristic";
+                return HEURISTIC_NETWORK;
             }
         }
 
@@ -144,6 +154,48 @@ public final class NameBlocking
         }
         String network = classifyOnly(type.getName());
         sCache.put(type, network);
+        return network;
+    }
+
+    /**
+     * Klasifikasi lengkap untuk satu view: jaringan iklan, atau {@code null}
+     * bila view ini bukan iklan atau milik aplikasi target sendiri.
+     * <p>
+     * Mengembalikan nama jaringan — bukan sekadar boolean — karena pemanggil
+     * harus bisa membedakan dua tingkat keyakinan yang sangat berbeda:
+     * <ul>
+     *   <li>{@link #HEURISTIC_NETWORK}: tebakan dari nama kelas saja. Cocok
+     *       untuk banner SDK yang namanya tidak di-obfuscate, tetapi juga
+     *       cocok untuk komponen UI biasa aplikasi.</li>
+     *   <li>Nama jaringan lain: kelas itu memang ada di daftar pemblokir SDK
+     *       yang didukung modul.</li>
+     * </ul>
+     * Perbedaan ini menentukan boleh atau tidaknya view <em>dibuang</em> dari
+     * pohon view (lihat {@link #nameBasedBlocking}).
+     *
+     * <p>
+     * Pencatatan statistik dilakukan di sini, sekali per view, memakai
+     * {@link ViewBlocking#markSeen}.
+     */
+    static String networkFor(String pkgName, View view)
+    {
+        if (view == null)
+        {
+            return null;
+        }
+        String network = classifyCached(view.getClass());
+        if (network == null || network.isEmpty())
+        {
+            return null;
+        }
+        if (belongsToApp(view.getClass().getName(), pkgName))
+        {
+            return null;
+        }
+        if (ViewBlocking.markSeen(view))
+        {
+            Util.countBlockedAd(view.getContext(), pkgName, network);
+        }
         return network;
     }
 
@@ -179,24 +231,7 @@ public final class NameBlocking
      */
     public static boolean isAdView(String pkgName, View view)
     {
-        if (view == null)
-        {
-            return false;
-        }
-        String network = classifyCached(view.getClass());
-        if (network == null || network.isEmpty())
-        {
-            return false;
-        }
-        if (belongsToApp(view.getClass().getName(), pkgName))
-        {
-            return false;
-        }
-        if (ViewBlocking.markSeen(view))
-        {
-            Util.countBlockedAd(view.getContext(), pkgName, network);
-        }
-        return true;
+        return networkFor(pkgName, view) != null;
     }
 
     /**
@@ -227,15 +262,28 @@ public final class NameBlocking
             return;
         }
 
-        // isAdView(String, View) hanya mencatat bila view belum pernah dilihat,
-        // jadi penelusuran berulang pada pohon yang sama tidak menggelembungkan
+        // networkFor() hanya mencatat bila view belum pernah dilihat, jadi
+        // penelusuran berulang pada pohon yang sama tidak menggelembungkan
         // statistik.
-        if (isAdView(packageName, view))
+        String network = networkFor(packageName, view);
+        if (network != null)
         {
-            ViewBlocking.removeAdView(packageName, view);
             Util.log(packageName, "clearAdViewInLayout: " + view.getClass().getName());
-            // Subtree iklan dibuang seluruhnya; tidak perlu ditelusuri lagi.
-            return;
+            if (AdClassification.isHeuristic(network))
+            {
+                // Tebakan nama: susutkan saja, jangan lepas dari pohon. View
+                // aplikasi yang kebetulan bernama mirip iklan masih dipakai
+                // ulang lewat findViewById (lihat catatan di addView).
+                ViewBlocking.shrinkAdView(view);
+                // Subtree tetap ditelusuri: anak-anaknya bisa jadi iklan SDK
+                // sungguhan yang layak dibuang.
+            }
+            else
+            {
+                ViewBlocking.removeAdView(packageName, view);
+                // Subtree iklan SDK dibuang seluruhnya.
+                return;
+            }
         }
 
         if (view instanceof ViewGroup)
@@ -260,21 +308,47 @@ public final class NameBlocking
                     return;
                 }
                 View view = (View) param.args[0];
-                if (isAdView(pkgName, view))
+                String network = networkFor(pkgName, view);
+                if (network == null)
                 {
-                    Util.log(pkgName, "addView: " + view.getClass().getName());
-                    // Jangan tambahkan view iklan sama sekali, sehingga parent
-                    // tidak perlu menata ulang tata letak untuknya.
-                    //
-                    // setResult(null) dipakai apa pun status parent-nya:
-                    // ViewGroup.addView menambahkan view ke parent-nya sendiri,
-                    // jadi view yang masih punya parent lain akan tetap
-                    // ditambahkan ke parent yang sedang diproses — iklan tetap
-                    // muncul. Memanggil removeAdView() di sini juga memicu
-                    // requestLayout saat addView sedang berjalan, yang pada
-                    // beberapa aplikasi berujung layout berulang tanpa henti.
-                    param.setResult(null);
+                    return;
                 }
+                Util.log(pkgName, "addView: " + view.getClass().getName());
+
+                if (AdClassification.isHeuristic(network))
+                {
+                    // Hasil heuristik hanya tebakan dari nama kelas. Membuang
+                    // view seperti ini dari pohon terbukti mematikan aplikasi:
+                    //
+                    //   CapCut  com.vega.ui.banner.BannerView -> dihapus, lalu
+                    //           BannerCardViewHolder.t0 melempar
+                    //           "NullPointerException: must not be null".
+                    //   MiChat  com.zenmen.palmchat.ui.widget.FeedBottomBannerView
+                    //           dan com.michatapp.ad.view.MeTabBannerAdView ->
+                    //           dihapus, lalu PhotoViewActivity.D1:139 dan
+                    //           SettingsFragment:312 NPE pada findViewById.
+                    //
+                    // Keduanya memakai view-nya sendiri lewat findViewById;
+                    // setResult(null) membuat pemanggil menerima null.
+                    // Karena itu view dibiarkan terpasang lalu dikecilkan
+                    // (tinggi 0 + GONE) — iklan tetap tidak terlihat, dan
+                    // findViewById tetap mengembalikan objeknya.
+                    ViewBlocking.shrinkAdView(view);
+                    return;
+                }
+
+                // Kelas SDK yang memang ada di daftar pemblokir: aman dibuang
+                // sama sekali, sehingga parent tidak perlu menata letak untuk
+                // view yang tidak akan pernah tampil.
+                //
+                // setResult(null) dipakai apa pun status parent-nya:
+                // ViewGroup.addView menambahkan view ke parent-nya sendiri, jadi
+                // view yang masih punya parent lain akan tetap ditambahkan ke
+                // parent yang sedang diproses — iklan tetap muncul. Memanggil
+                // removeAdView() di sini juga memicu requestLayout saat addView
+                // sedang berjalan, yang pada beberapa aplikasi berujung layout
+                // berulang tanpa henti.
+                param.setResult(null);
             }
         });
 
@@ -310,9 +384,18 @@ public final class NameBlocking
                     // RecyclerView memicu ribuan pemeriksaan per frame —
                     // terasa sebagai UI yang berputar dan boros CPU.
                     View root = (View) result;
-                    if (isAdView(pkgName, root))
+                    String network = networkFor(pkgName, root);
+                    if (network != null)
                     {
-                        ViewBlocking.removeAdView(pkgName, root);
+                        if (AdClassification.isHeuristic(network))
+                        {
+                            // Hasil heuristik: susutkan, jangan lepas.
+                            ViewBlocking.shrinkAdView(root);
+                        }
+                        else
+                        {
+                            ViewBlocking.removeAdView(pkgName, root);
+                        }
                     }
                 }
             }

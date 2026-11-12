@@ -70,6 +70,29 @@ public final class FirstPartyApps
                 "com.google.android.apps.youtube",
         });
 
+        // MiChat. Dua namespace-nya terbukti dari jejak crash di perangkat:
+        //   com.zenmen.palmchat.ui.widget.FeedBottomBannerView  -> NPE di
+        //       com.zenmen.palmchat.photoview.PhotoViewActivity.D1:139
+        //   com.michatapp.ad.view.MeTabBannerAdView             -> NPE di
+        //       et8.onCreateView(SettingsFragment:312)
+        // Keduanya view milik aplikasi sendiri yang dipakai ulang lewat
+        // findViewById; menghapusnya dari pohon view membuat pemanggil
+        // berikutnya menerima null. Iklan MiChat tetap diblokir lewat SDK
+        // (Pangle, GMS, ironSource, Fyber, AppLovin).
+        map.put("com.michatapp.im", new String[]{
+                "com.zenmen.palmchat",
+                "com.michatapp",
+        });
+
+        // CapCut. Kodenya berada di com.vega.*, bukan di applicationId:
+        // com.vega.ui.banner.BannerView dihapus oleh heuristik nama, lalu
+        // BannerCardViewHolder.t0 melempar "NullPointerException must not be
+        // null" karena view itu sudah tidak ada saat di-bind.
+        map.put("com.lemon.lvoverseas", new String[]{
+                "com.vega",
+                "com.lemon",
+        });
+
         NAMESPACES = Collections.unmodifiableMap(map);
     }
 

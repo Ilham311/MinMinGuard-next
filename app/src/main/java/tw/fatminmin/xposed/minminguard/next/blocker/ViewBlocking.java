@@ -65,10 +65,57 @@ public class ViewBlocking
         }
 
         Util.notifyRemoveAdView(view.getContext(), packageName, 1);
-        removeAdView(packageName, view, true, 0);
+        collapseTree(view);
     }
 
-    private static void removeAdView(final String packageName, final View view, final boolean first, final int depth)
+    /**
+     * Menyusutkan view beserta ancestor-nya yang setinggi ruang iklan,
+     * <em>tanpa</em> menyentuh statistik.
+     */
+    private static void collapseTree(View view)
+    {
+        collapseTree(view, true, 0);
+    }
+
+    /**
+     * Menyusutkan view menjadi tidak terlihat <em>tanpa</em> melepasnya dari
+     * parent-nya.
+     * <p>
+     * Dipakai untuk hasil heuristik nama, yang hanya berupa tebakan. View yang
+     * masih terpasang tetap ditemukan {@code findViewById}, sehingga aplikasi
+     * yang memakai ulang komponennya sendiri tidak menerima {@code null} —
+     * dua crash nyata di perangkat berasal dari sini: CapCut
+     * ({@code BannerCardViewHolder.t0: "must not be null"}) dan MiChat
+     * ({@code PhotoViewActivity.D1:139}, {@code SettingsFragment:312}).
+     * <p>
+     * Berbeda dengan {@link #removeAdView}, method ini tidak menyentuh
+     * {@code LayoutParams} saat {@code addView} sedang berjalan: penyusutan
+     * dijadwalkan lewat {@code post()} milik view itu sendiri, yang baru
+     * berjalan setelah view terpasang dan layout berikutnya dimulai.
+     */
+    public static void shrinkAdView(View view)
+    {
+        if (view == null)
+        {
+            return;
+        }
+
+        view.post(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                // View yang dilepas pemiliknya tidak akan pernah tampil, jadi
+                // tidak perlu diapa-apakan.
+                if (view.getParent() != null)
+                {
+                    collapse(view);
+                }
+            }
+        });
+    }
+
+    private static void collapseTree(final View view, final boolean first, final int depth)
     {
         if (view == null)
         {
@@ -114,7 +161,7 @@ public class ViewBlocking
 
         if (view.getParent() instanceof ViewGroup)
         {
-            removeAdView(packageName, (View) view.getParent(), false, depth + 1);
+            collapseTree((View) view.getParent(), false, depth + 1);
         }
     }
 

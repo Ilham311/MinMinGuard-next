@@ -114,6 +114,66 @@ row to `content://tw.fatminmin.xposed.minminguard.next/active`. An app therefore
 appears the first time it is opened after being added to scope. *Forget app
 list* clears those rows without deleting statistics.
 
+## What changed in 4.0.1
+
+A crash fix, driven entirely by device evidence: CapCut and MiChat died with
+`NullPointerException` in code that had nothing to do with ads.
+
+**What was wrong**
+
+The name layer treated every match as equally certain, and on a match it
+called `param.setResult(null)` on `ViewGroup.addView` — the view never entered
+the hierarchy. That is correct for a class that ships in an ad SDK. It is
+wrong for a *guess* made from a class name, because the app may look that
+view up again with `findViewById` and receive `null`.
+
+Three crashes, all with this exact shape:
+
+| App | View dropped | Crash |
+| --- | --- | --- |
+| CapCut | `com.vega.ui.banner.BannerView` | `BannerCardViewHolder.t0`: `NullPointerException: must not be null` |
+| MiChat | `com.zenmen.palmchat.ui.widget.FeedBottomBannerView` | `PhotoViewActivity.D1:139`: NPE on `setVisibility` |
+| MiChat | `com.michatapp.ad.view.MeTabBannerAdView` | `SettingsFragment:312`: NPE in `LifecycleRegistry.addObserver` |
+
+**The fix**
+
+- `core/name/AdClassification` now encodes the rule: only SDK-sourced
+  classifications may detach a view from the tree. A heuristic match is
+  shrunk to zero height and `GONE` instead (`ViewBlocking.shrinkAdView`), so
+  the ad is invisible but `findViewById` still returns the object.
+- `FirstPartyApps` learned two more code namespaces, both proven by the crash
+  traces rather than guessed: MiChat (`com.michatapp.im` → `com.zenmen.palmchat`,
+  `com.michatapp`) and CapCut (`com.lemon.lvoverseas` → `com.vega`, `com.lemon`).
+  SDK classes used by those apps stay in third-party namespaces and are still
+  blocked.
+- `NameBlocking` returns the network name instead of a boolean, so the caller
+  can tell what it is dealing with; `ViewBlocking.collapseTree` splits the
+  tree-shrinking out of `removeAdView` so statistics are counted once per view.
+
+**Tests**
+
+`AdClassificationTest` locks the invariant "a guess may not remove a view",
+`FirstPartyAppsTest` gained the five real class names above. 53 JVM tests pass.
+
+**Not fixed here: Instagram and YouTube**
+
+Both are expected, and neither is a code defect in the name heuristic.
+
+- *Instagram* is in scope and the module does load — the log shows
+  `hook [com.instagram.android]: SDK_API=0/1 NAME=12/0`. `SDK_API=0/1` means
+  every SDK class the module knows about is absent from the APK: Instagram
+  ships no third-party ad SDK. Its ads arrive through GraphQL. `NAME=12` means
+  the view hooks are installed, but `FirstPartyApps` deliberately exempts
+  `com.instagram.*`, so the name layer does nothing there.
+- *YouTube* was simply not in the module's LSPosed scope at all, so the module
+  never loaded in that process. Ticking it in LSPosed is a device-side setting;
+  even then the outcome would match Instagram, since `youtubei` ads are
+  first-party too.
+
+Blocking first-party, server-side-inserted ads is out of scope for this
+module. Pretending the name heuristic could do it is what produced the crashes
+this release fixes.
+
 ## What changed in 4.0.0
 
 Two new ad networks and, more importantly, the first automated tests in the
