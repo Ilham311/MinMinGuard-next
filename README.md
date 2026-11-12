@@ -32,7 +32,7 @@ The project has been modernised (AGP 8.13 / Gradle 8.13, compileSdk 36, Java 17)
 
 Notes:
 
-- The module `applicationId` is `tw.fatminmin.xposed.minminguard.next` (version 3.1.3, versionCode 76). Xposed/LSPosed scope strings and the `assets/xposed_init` entry refer to this package.
+- The module `applicationId` is `tw.fatminmin.xposed.minminguard.next` (version 4.0.0, versionCode 77). Xposed/LSPosed scope strings and the `assets/xposed_init` entry refer to this package.
 - `de.robv.android.xposed:api:82` is resolved from `https://api.xposed.info/` (jcenter is gone).
 - If you point the build at a local SDK, put `sdk.dir=` in `local.properties` (git-ignored).
 
@@ -84,6 +84,63 @@ root, so the module reports itself instead: every process it hooks writes one
 row to `content://tw.fatminmin.xposed.minminguard.next/active`. An app therefore
 appears the first time it is opened after being added to scope. *Forget app
 list* clears those rows without deleting statistics.
+
+## What changed in 4.0.0
+
+Two new ad networks and, more importantly, the first automated tests in the
+project — including the invariant that would have caught the prefix bugs found
+while adding them.
+
+**New blockers**
+
+- *Google IMA* (`com.google.ads.interactivemedia`) — pre-roll and mid-roll
+  video ads. Hooks are installed on the concrete object returned by
+  `ImaSdkFactory.createAdsLoader()`, not on the `AdsLoader` interface: an
+  interface has no method body to hook, and the concrete implementation class
+  is renamed every release (`zzan` in 3.40.0). `createAdsRequest()` and
+  `requestStream()` are deliberately left alone — the first returns a
+  configuration object the app uses directly, and the second is the
+  server-side ad insertion path, where blocking it would stop the user's video
+  rather than just its ads.
+- *Huawei Ads Kit* (`com.huawei.hms.ads`) — `BannerView`, `InterstitialAd`,
+  `RewardAd`, `SplashView`, `SplashAd`. Every class name was verified with
+  `javap` against the official `ads-base`, `ads-banner`, `ads-reward`,
+  `ads-interstitial` and `ads-splash` AARs at 13.4.91.301.
+
+**Bugs found in the existing code**
+
+- `UnityAds` pointed at `com.unity3d.services.banners.view.BannerView`. That
+  class does not exist in unity-ads 3.7.5, 4.12.0, 4.12.5 or 4.21.0, so the
+  name-based safety net for Unity had been dead since it was written. It is now
+  `com.unity3d.services.banners.BannerView`.
+- `GoogleGms` was listed before `GoogleGmsDoubleClick`. Name matching uses the
+  first match, so every `PublisherAdView` was reported as GoogleGms.
+- `AdCallbacks` returned `null` for interface return types, so an
+  `onAdError(AdErrorEvent)` listener received null and apps that call
+  `event.getError().getMessage()` crashed. It now builds a nested stub.
+
+**Tests (53, JVM only)**
+
+`core/` now holds logic that does not touch Android — `HookEngine`,
+`HookLedger`, `HierarchyWalk`, `AdNameMatcher`, `NameCache`,
+`BlocklistValidator` — so it can be tested without a device. CI runs
+`testDebugUnitTest` in both the debug and the release job.
+
+`BlockerOrderTest` is the one that matters most: it reads `Main.java`, resolves
+each blocker's package prefix, and fails if a parent prefix precedes a
+sub-package prefix. It caught both prefix bugs above on its first run.
+
+**Security**
+
+- `MinMinProvider` restricted `query` and `delete` to the module's own UID,
+  and `insert` to the calling package. The provider is exported so hooked apps
+  can write their own statistics; without these checks any app on the device
+  could read which apps the user runs, or wipe their counters.
+
+**Build**
+
+- Glide 4.16.0 and a ViewPager2-based intro replace AppIntro v4.2.3 from
+  JitPack, which let Jetifier be turned off.
 
 ## What changed in 3.1.3
 
