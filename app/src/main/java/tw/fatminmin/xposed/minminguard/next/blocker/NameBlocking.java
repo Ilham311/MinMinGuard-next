@@ -10,6 +10,7 @@ import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import tw.fatminmin.xposed.minminguard.next.Main;
 import tw.fatminmin.xposed.minminguard.next.core.name.AdNameMatcher;
+import tw.fatminmin.xposed.minminguard.next.core.name.FirstPartyApps;
 import tw.fatminmin.xposed.minminguard.next.core.name.NameCache;
 
 /**
@@ -161,10 +162,20 @@ public final class NameBlocking
     }
 
     /**
-     * Memeriksa dan mencatat bila view ini iklan.
+     * Seperti {@link #isAdView(View)} tetapi mengecualikan kelas milik aplikasi
+     * target sendiri.
      * <p>
-     * Pencatatan hanya terjadi di sini, dan pemanggil memanggilnya sekali per
-     * view berkat {@link ViewBlocking#markSeen}.
+     * Tanpa pengecualian ini, heuristik nama menghapus komponen UI biasa yang
+     * kebetulan berakhiran {@code BannerView}. Kasus nyata yang ditemukan dari
+     * bytecode Instagram 454: {@code OngoingMetaAiVoiceBannerView} — banner
+     * panggilan Meta AI di DM, bukan iklan. Ia lolos sebagai "iklan" hanya
+     * karena namanya, lalu dihapus dari pohon view.
+     * <p>
+     * Yang dikecualikan hanya kelas yang tinggal di dalam paket aplikasi itu
+     * sendiri. Kelas SDK tetap berada di paket SDK dan tetap disaring, jadi
+     * pemblokiran iklan tidak berkurang.
+     *
+     * @param pkgName paket aplikasi yang prosesnya sedang di-hook
      */
     public static boolean isAdView(String pkgName, View view)
     {
@@ -177,11 +188,27 @@ public final class NameBlocking
         {
             return false;
         }
+        if (belongsToApp(view.getClass().getName(), pkgName))
+        {
+            return false;
+        }
         if (ViewBlocking.markSeen(view))
         {
             Util.countBlockedAd(view.getContext(), pkgName, network);
         }
         return true;
+    }
+
+    /**
+     * True bila kelas milik namespace aplikasi target sendiri.
+     * <p>
+     * Perbandingan memakai batas titik, bukan {@code startsWith} mentah, agar
+     * {@code com.instagram.androidx.Foo} tidak dianggap bagian dari
+     * {@code com.instagram.android}.
+     */
+    static boolean belongsToApp(String className, String pkgName)
+    {
+        return FirstPartyApps.ownsClass(pkgName, className);
     }
 
     public static void clearAdViewInLayout(String packageName, View view)

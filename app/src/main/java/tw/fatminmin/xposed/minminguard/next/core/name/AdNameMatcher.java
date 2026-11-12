@@ -140,4 +140,51 @@ public final class AdNameMatcher
         }
         return false;
     }
+
+    /**
+     * True bila kelas milik aplikasi target sendiri, dilihat dari namespace
+     * kode yang ia pakai — bukan dari {@code applicationId}.
+     * <p>
+     * Ini penting karena keduanya tidak selalu sama, dan perbedaan itu justru
+     * ditemukan saat mengaudit dua aplikasi nyata:
+     * <ul>
+     *   <li>{@code com.instagram.android} menaruh kodenya di
+     *       {@code com.instagram.*}, mis.
+     *       {@code com.instagram.direct.rtc.ongoingcallbar.metaaivoice.OngoingMetaAiVoiceBannerView}
+     *       — banner panggilan Meta AI di DM, bukan iklan, tetapi cocok dengan
+     *       akhiran {@code BannerView} dan akan dihapus dari pohon view.</li>
+     *   <li>{@code com.google.android.youtube} menaruh kodenya di
+     *       {@code com.google.android.libraries.youtube.*}, mis.
+     *       {@code ...ads.player.ui.AdDisclosureBannerView}.</li>
+     * </ul>
+     * Karena itu pengecualian memakai daftar namespace milik aplikasi, bukan
+     * {@code applicationId}. SDK iklan tetap berada di namespace pihak ketiga
+     * dan tetap disaring.
+     *
+     * @param className kelas yang diperiksa
+     * @param namespaces daftar prefix namespace milik aplikasi target
+     */
+    public static boolean belongsToApp(String className, String... namespaces)
+    {
+        if (className == null || namespaces == null)
+        {
+            return false;
+        }
+        for (String ns : namespaces)
+        {
+            if (ns == null || ns.isEmpty())
+            {
+                continue;
+            }
+            // Batas titik, bukan startsWith mentah: "com.instagram.androidx"
+            // bukan bagian dari "com.instagram.android".
+            if (className.startsWith(ns)
+                    && className.length() > ns.length()
+                    && className.charAt(ns.length()) == '.')
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 }
